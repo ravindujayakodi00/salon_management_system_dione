@@ -1,0 +1,209 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Primary Colors - Olive Green (fixed palette; BrandingProvider aligns runtime CSS vars to these) */
+  --color-primary-50: #f4f7f4;
+  --color-primary-100: #e3ebe3;
+  --color-primary-200: #c5d6c5;
+  --color-primary-300: #9cb89c;
+  --color-primary-400: #749674;
+  --color-primary-500: #567856;
+  --color-primary-600: #4B5945;
+  --color-primary-700: #3a453a;
+  --color-primary-800: #303830;
+  --color-primary-900: #282e28;
+  --color-primary-950: #151a15;
+
+  /* Secondary Colors - Teal */
+  --color-secondary-50: #f0fdfa;
+  --color-secondary-100: #ccfbf1;
+  --color-secondary-200: #99f6e4;
+  --color-secondary-300: #5eead4;
+  --color-secondary-400: #2dd4bf;
+  --color-secondary-500: #14b8a6;
+  --color-secondary-600: #0d9488;
+  --color-secondary-700: #0f766e;
+  --color-secondary-800: #115e59;
+  --color-secondary-900: #134e4a;
+  --color-secondary-950: #042f2e;
+
+  /* Danger Colors - Red */
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-200: #fecaca;
+  --color-danger-300: #fca5a5;
+  --color-danger-400: #f87171;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+  --color-danger-800: #991b1b;
+  --color-danger-900: #7f1d1d;
+  --color-danger-950: #450a0a;
+
+  /* Warning Colors - Amber */
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-300: #fcd34d;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+  --color-warning-900: #78350f;
+  --color-warning-950: #451a03;
+
+  /* Success Colors - Green */
+  --color-success-50: #f0fdf4;
+  --color-success-100: #dcfce7;
+  --color-success-200: #bbf7d0;
+  --color-success-300: #86efac;
+  --color-success-400: #4ade80;
+  --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
+  --color-success-700: #15803d;
+  --color-success-800: #166534;
+  --color-success-900: #14532d;
+  --color-success-950: #052e16;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #111827;
+  /* Fallbacks before BrandingProvider runs */
+  --brand-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --brand-shadow-sm: 0 2px 4px -1px rgba(15, 23, 42, 0.06), 0 4px 8px -2px rgba(15, 23, 42, 0.06);
+  --brand-shadow-md: 0 6px 12px -2px rgba(15, 23, 42, 0.08), 0 12px 18px -4px rgba(15, 23, 42, 0.08);
+  --brand-shadow-lg: 0 12px 24px -4px rgba(15, 23, 42, 0.1);
+  --brand-shadow-dark-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --brand-shadow-dark-md: 0 8px 20px rgba(0, 0, 0, 0.45);
+  --brand-ring-soft: rgba(20, 184, 166, 0.35);
+  --brand-glow-subtle: 0 0 0 3px rgba(20, 184, 166, 0.12);
+}
+
+.dark {
+  --background: #111827;
+  --foreground: #f9fafb;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl;
+  }
+
+  /**
+   * Branded panel: borders + shadows follow --color-primary-* (set per org).
+   * Replaces flat gray-100/700 cards that clash with custom brand colors.
+   */
+  .surface-panel {
+    @apply border bg-white/98 dark:bg-primary-950/45 backdrop-blur-[0.5px];
+    border-color: color-mix(in srgb, var(--color-primary-200) 78%, white);
+    box-shadow: var(--brand-shadow-sm);
+  }
+
+  .dark .surface-panel {
+    border-color: color-mix(in srgb, var(--color-primary-600) 38%, var(--color-primary-950));
+    box-shadow: var(--brand-shadow-dark-sm);
+  }
+
+  .card-hover {
+    @apply transition-[box-shadow,border-color,transform] duration-200;
+  }
+
+  .surface-panel.card-hover:hover {
+    box-shadow: var(--brand-shadow-md);
+    border-color: color-mix(in srgb, var(--color-primary-300) 55%, white);
+  }
+
+  .dark .surface-panel.card-hover:hover {
+    box-shadow: var(--brand-shadow-dark-md);
+    border-color: color-mix(in srgb, var(--color-primary-500) 42%, var(--color-primary-950));
+  }
+}
+
+/* Appointment blinking animations */
+@keyframes appointment-blink-warning {
+
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 15px 3px rgba(245, 158, 11, 0.5);
+  }
+}
+
+@keyframes appointment-blink-danger {
+
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+  }
+
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 15px 3px rgba(220, 38, 38, 0.5);
+  }
+}
+
+.appointment-blink-warning {
+  animation: appointment-blink-warning 1.5s ease-in-out infinite;
+}
+
+.appointment-blink-danger {
+  animation: appointment-blink-danger 1s ease-in-out infinite;
+}
+
+/* Scrollbar tracks primary palette when BrandingProvider sets --color-primary-* */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--color-primary-50, #f3f4f6) 90%, white);
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--color-primary-950, #1f2937);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-primary-400, #749674);
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary-500, #567856);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--color-primary-600, #4b5945);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary-500, #567856);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-primary-400, #749674) var(--color-primary-50, #f3f4f6);
+}
+
+.dark * {
+  scrollbar-color: var(--color-primary-600, #4b5945) var(--color-primary-950, #1f2937);
+}
