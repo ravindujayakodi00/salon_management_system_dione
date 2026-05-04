@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Image from 'next/image';
-import logoLongLight from '@/assets/logo-pack/logo-long-light.png';
 import { useWebsiteAuth } from '@/context/WebsiteAuthContext';
 import {
     fetchServices,
@@ -14,6 +12,7 @@ import {
     type Branch,
     type ConsolidatedSlot,
 } from '@/lib/website/api';
+import Link from "next/link";
 
 // Timezone-safe min date (uses local date, not UTC)
 function getMinDate(): string {
@@ -1247,7 +1246,15 @@ export default function AppointmentSection({ isStandalone = false }: Appointment
                     {/* Left Sidebar */}
                     <div className="w-72 bg-[var(--t-bg-2)] border-r border-[var(--t-border)] p-6 flex flex-col">
                         <div className="mb-6">
-                            <Image src={logoLongLight} alt="VG Salon" height={44} className="w-auto" />
+                            {/* Logo */}
+                            <Link
+                                href="/"
+                                className="font-heading text-xl font-bold tracking-tight text-white"
+                            >
+                                DI
+                                <span className="relative mx-px inline-block h-[0.45em] w-[0.9em] rounded-full bg-fire align-middle" />
+                                NE
+                            </Link>
                         </div>
                         <p className="t-script text-[var(--t-accent-2)] mb-5" style={{ fontSize: '1rem' }}>Reserve Your Appointment</p>
 
@@ -1302,7 +1309,15 @@ export default function AppointmentSection({ isStandalone = false }: Appointment
                     {/* Mobile Header */}
                     <div className="flex-shrink-0 bg-[var(--t-bg-2)] border-b border-[var(--t-border)] px-4 py-3">
                         <div className="flex items-center justify-between mb-2">
-                            <Image src={logoLongLight} alt="VG Salon" height={30} className="w-auto" />
+                            {/* Logo */}
+                            <Link
+                                href="/"
+                                className="font-heading text-xl font-bold tracking-tight text-white"
+                            >
+                                DI
+                                <span className="relative mx-px inline-block h-[0.45em] w-[0.9em] rounded-full bg-fire align-middle" />
+                                NE
+                            </Link>
                             <div className="flex items-center gap-2">
                                 {cart.length > 0 && (
                                     <span className="bg-[var(--t-accent)] text-[var(--t-text)] text-xs px-3 py-1 font-medium tracking-wider uppercase">
