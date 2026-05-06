@@ -79,6 +79,7 @@ export default function AppointmentSection({ isStandalone = false }: Appointment
     const [cart, setCart] = useState<BookingData[]>([]);
     const [customer, setCustomer] = useState<CustomerData>({ name: '', email: '', phone: '', notes: '' });
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [searchQuery, setSearchQuery] = useState<string>('');
 
     // OTP States
     const [otpSent, setOtpSent] = useState(false);
@@ -515,10 +516,10 @@ export default function AppointmentSection({ isStandalone = false }: Appointment
         }
     };
 
-    // Filter services by category
-    const filteredServices = selectedCategory === 'all'
-        ? services
-        : services.filter(s => s.category === selectedCategory);
+    // Filter services by category and search query
+    const filteredServices = services
+        .filter(s => selectedCategory === 'all' || s.category === selectedCategory)
+        .filter(s => !searchQuery.trim() || s.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
     // Navigation Buttons Component
     const NavButtons = ({ showBack = true, showNext = true }: { showBack?: boolean; showNext?: boolean }) => (
@@ -758,6 +759,29 @@ export default function AppointmentSection({ isStandalone = false }: Appointment
                             </div>
                         )}
 
+                        {/* Search */}
+                        <div className="relative mb-4">
+                            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--t-text-3)] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search services..."
+                                className="w-full pl-9 pr-9 py-2.5 bg-[var(--t-bg-2)] border border-[var(--t-border)] text-[var(--t-text)] placeholder-[var(--t-text-3)] focus:border-[var(--t-accent-2)] focus:outline-none transition-all text-sm"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--t-text-3)] hover:text-[var(--t-text)] text-xs leading-none transition-colors"
+                                    aria-label="Clear search"
+                                >
+                                    ✕
+                                </button>
+                            )}
+                        </div>
+
                         {/* Category Filter */}
                         <div className="flex flex-wrap gap-2 mb-4">
                             {serviceCategories.map(cat => (
@@ -778,6 +802,15 @@ export default function AppointmentSection({ isStandalone = false }: Appointment
                             <div className="text-center py-12">
                                 <div className="w-6 h-6 border-2 border-[var(--t-accent-2)] border-t-transparent rounded-full mx-auto animate-spin"></div>
                                 <p className="text-[var(--t-text-3)] mt-3 text-sm">Loading services...</p>
+                            </div>
+                        ) : filteredServices.length === 0 ? (
+                            <div className="text-center py-10 text-[var(--t-text-3)]">
+                                <p className="text-sm">No services found{searchQuery ? ` for "${searchQuery}"` : ''}.</p>
+                                {searchQuery && (
+                                    <button onClick={() => setSearchQuery('')} className="mt-2 text-xs text-[var(--t-accent-2)] hover:text-[var(--t-text)] transition-colors underline underline-offset-2">
+                                        Clear search
+                                    </button>
+                                )}
                             </div>
                         ) : (
                             <div>
@@ -1239,7 +1272,7 @@ export default function AppointmentSection({ isStandalone = false }: Appointment
             <section
                 ref={sectionRef}
                 id="appointment"
-                className={`${isStandalone ? 'min-h-[100dvh] pt-16' : 'h-[100dvh]'} w-full bg-[var(--t-bg)] relative z-10 overflow-hidden overflow-x-hidden`}
+                className={`${isStandalone ? 'min-h-[100dvh] pt-16 lg:h-[100dvh] lg:overflow-hidden' : 'h-[100dvh] overflow-hidden'} w-full bg-[var(--t-bg)] relative z-10 overflow-x-hidden`}
             >
                 {/* Desktop Layout — hidden on mobile via Tailwind */}
                 <div className="h-full hidden lg:flex">
@@ -1305,9 +1338,9 @@ export default function AppointmentSection({ isStandalone = false }: Appointment
                 </div>
 
                 {/* Mobile Layout — shown only on mobile via Tailwind */}
-                <div className="h-full flex flex-col lg:hidden overflow-x-hidden">
+                <div className="flex flex-col lg:hidden overflow-x-hidden">
                     {/* Mobile Header */}
-                    <div className="flex-shrink-0 bg-[var(--t-bg-2)] border-b border-[var(--t-border)] px-4 py-3">
+                    <div className="sticky top-0 z-10 bg-[var(--t-bg-2)] border-b border-[var(--t-border)] px-4 py-3">
                         <div className="flex items-center justify-between mb-2">
                             {/* Logo */}
                             <Link
@@ -1337,8 +1370,8 @@ export default function AppointmentSection({ isStandalone = false }: Appointment
                         </div>
                     </div>
 
-                    {/* Mobile Content — min-h-0 ensures flex-1 can shrink and scroll properly */}
-                    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4">
+                    {/* Mobile Content — natural page scroll (no fixed height constraint) */}
+                    <div className="overflow-x-hidden p-4 pb-12">
                         {renderStepContent()}
                     </div>
                 </div>
