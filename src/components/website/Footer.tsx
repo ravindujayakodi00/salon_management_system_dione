@@ -18,7 +18,7 @@ const LINKS = {
   ],
   Connect: [
     ...footer.socials.map(s => ({ label: s.name, href: s.href })),
-    { label: 'Google Maps', href: 'https://www.google.com/maps' },
+    { label: 'Google Maps', href: 'https://www.google.com/maps/place/Dione+cuts+%26+Beauty+salon/@6.848141,79.9225242,17z/data=!3m1!4b1!4m6!3m5!1s0x3ae25100167270d5:0x5a6563fd1038ded8!8m2!3d6.848141!4d79.9250991!16s%2Fg%2F11vt83l0_b' },
   ],
 } as const;
 
@@ -41,8 +41,11 @@ export default function Footer() {
               NE
             </Link>
             <address className="mt-5 text-sm not-italic leading-relaxed text-zinc-600">
-              {/* TODO: Replace with actual Dione Salon address */}
-              TODO: Salon Address
+              75A, Colombo Road,
+              <br />
+              Maharagama, Sri Lanka
+              <br />
+              +94 77 800 0440
               <br />
               Open daily · 9 am – 8 pm
             </address>

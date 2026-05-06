@@ -131,16 +131,12 @@ export const content = {
     label:   'Find Us',
     heading: 'Visit Dione Salon',
     subtext: 'Come find us or get in touch',
-    // TODO: Replace with actual Dione Salon address
-    address: ['TODO: Salon Address Line 1,', 'TODO: City, Sri Lanka'],
-    // TODO: Replace with actual Dione Salon phone number
-    phones:  ['TODO: Phone Number'],
-    // TODO: Replace with actual Dione Salon email
+    address: ['75A, Colombo Road,', 'Maharagama, Sri Lanka'],
+    phones:  ['+94 77 800 0440'],
     emails:  ['TODO: email@dionesalon.lk'],
-    // TODO: Replace with actual Dione Salon hours
     hours:   ['Mon – Sat: 9:00 AM – 8:00 PM', 'Sun: 10:00 AM – 6:00 PM'],
-    // TODO: Replace with actual Google Maps embed URL for Dione Salon
-    mapUrl:  'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3960.9!2d79.856!3d6.914!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNsKwNTQnNTAuNiJOIDc5wrA1MSczMy42IkU!5e0!3m2!1sen!2slk!4v1',
+    // Dione Cuts & Beauty Salon — 6.848141, 79.9250991
+    mapUrl:  'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3961.5!2d79.9225242!3d6.848141!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ae25100167270d5%3A0x5a6563fd1038ded8!2sDione+cuts+%26+Beauty+salon!5e0!3m2!1sen!2slk!4v1',
   },
 
   expertise: {
