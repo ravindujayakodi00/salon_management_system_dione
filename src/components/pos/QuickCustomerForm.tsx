@@ -17,31 +17,20 @@ interface QuickCustomerFormProps {
     initialPhone?: string;
 }
 
-// Phone validation helper
-const validatePhone = (phone: string): { isValid: boolean; message: string; country?: string } => {
-    const cleaned = phone.replace(/\D/g, '');
-
-    // Sri Lanka numbers start with 94 or 0 and have 10-12 digits total
-    if (cleaned.startsWith('94')) {
-        if (cleaned.length === 11) {
-            return { isValid: true, message: 'Valid Sri Lankan number', country: 'LK 🇱🇰' };
-        }
-        return { isValid: false, message: 'Sri Lankan numbers should be 11 digits (94XXXXXXXXXX)' };
-    } else if (cleaned.startsWith('0')) {
-        if (cleaned.length === 10) {
-            return { isValid: true, message: 'Valid Sri Lankan number', country: 'LK 🇱🇰' };
-        }
-        return { isValid: false, message: 'Sri Lankan numbers should be 10 digits (07XXXXXXXX)' };
-    } else if (cleaned.length >= 9) {
-        // Assume local number
-        if (cleaned.length === 9) {
-            return { isValid: true, message: 'Valid local number', country: 'LK 🇱🇰' };
-        }
-        return { isValid: false, message: 'Please enter a valid phone number' };
-    }
-
-    return { isValid: false, message: 'Phone number too short' };
+// Phone validation: always +94 + exactly 9 digits
+const validatePhone = (digits: string): { isValid: boolean; message: string } => {
+    if (digits.length === 0) return { isValid: false, message: 'Phone number is required' };
+    if (digits.length < 9) return { isValid: false, message: `${9 - digits.length} more digit${9 - digits.length > 1 ? 's' : ''} needed` };
+    return { isValid: true, message: 'Valid number' };
 };
+
+// Extract 9-digit local number from any format
+function extractLocalDigits(value: string): string {
+    const digits = value.replace(/\D/g, '');
+    if (digits.startsWith('94') && digits.length >= 11) return digits.slice(2, 11);
+    if (digits.startsWith('0')) return digits.slice(1, 10);
+    return digits.slice(0, 9);
+}
 
 export default function QuickCustomerForm({
     isOpen,
@@ -51,7 +40,7 @@ export default function QuickCustomerForm({
 }: QuickCustomerFormProps) {
     const [formData, setFormData] = useState({
         name: '',
-        phone: initialPhone,
+        phoneDigits: extractLocalDigits(initialPhone),
         email: '',
         gender: ''
     });
@@ -59,11 +48,11 @@ export default function QuickCustomerForm({
     // Update phone when initialPhone changes
     useEffect(() => {
         if (initialPhone) {
-            setFormData(prev => ({ ...prev, phone: initialPhone }));
+            setFormData(prev => ({ ...prev, phoneDigits: extractLocalDigits(initialPhone) }));
         }
     }, [initialPhone]);
 
-    const phoneValidation = validatePhone(formData.phone);
+    const phoneValidation = validatePhone(formData.phoneDigits);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -74,13 +63,13 @@ export default function QuickCustomerForm({
 
         onSubmit({
             name: formData.name.trim(),
-            phone: formData.phone.trim(),
+            phone: `+94${formData.phoneDigits}`,
             email: formData.email.trim() || undefined,
             gender: formData.gender || undefined
         });
 
         // Reset form
-        setFormData({ name: '', phone: '', email: '', gender: '' });
+        setFormData({ name: '', phoneDigits: '', email: '', gender: '' });
     };
 
     if (!isOpen) return null;
@@ -123,41 +112,48 @@ export default function QuickCustomerForm({
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             Phone Number <span className="text-danger-500">*</span>
                         </label>
-                        <div className="relative">
-                            <Input
-                                type="tel"
-                                placeholder="07XXXXXXXX or 94XXXXXXXXXX"
-                                value={formData.phone}
-                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                required
-                                className={
-                                    formData.phone.length > 0
-                                        ? phoneValidation.isValid
-                                            ? 'border-success-500 focus:ring-success-500'
-                                            : 'border-danger-500 focus:ring-danger-500'
-                                        : ''
-                                }
-                            />
-                            {formData.phone.length > 0 && (
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                    {phoneValidation.country && (
-                                        <span className="text-xs font-medium text-gray-500">
-                                            {phoneValidation.country}
-                                        </span>
-                                    )}
-                                    {phoneValidation.isValid ? (
-                                        <CheckCircle className="h-5 w-5 text-success-500" />
-                                    ) : (
-                                        <AlertCircle className="h-5 w-5 text-danger-500" />
-                                    )}
-                                </div>
-                            )}
+                        <div className="flex">
+                            <span className="flex items-center px-3 py-2.5 bg-gray-100 dark:bg-gray-700 border border-r-0 border-gray-300 dark:border-gray-600 rounded-l-xl text-sm font-medium text-gray-700 dark:text-gray-300 select-none whitespace-nowrap">
+                                🇱🇰 +94
+                            </span>
+                            <div className="relative flex-1">
+                                <input
+                                    type="tel"
+                                    placeholder="701234567"
+                                    value={formData.phoneDigits}
+                                    onChange={(e) => {
+                                        let digits = e.target.value.replace(/\D/g, '');
+                                        if (digits.startsWith('0')) digits = digits.slice(1);
+                                        setFormData({ ...formData, phoneDigits: digits.slice(0, 9) });
+                                    }}
+                                    required
+                                    maxLength={9}
+                                    inputMode="numeric"
+                                    className={`w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-r-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-gray-900 dark:text-white placeholder-gray-400 ${
+                                        formData.phoneDigits.length > 0
+                                            ? phoneValidation.isValid
+                                                ? 'border-success-500 focus:ring-success-500'
+                                                : 'border-danger-500 focus:ring-danger-500'
+                                            : ''
+                                    }`}
+                                />
+                                {formData.phoneDigits.length > 0 && (
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                        {phoneValidation.isValid ? (
+                                            <CheckCircle className="h-5 w-5 text-success-500" />
+                                        ) : (
+                                            <AlertCircle className="h-5 w-5 text-danger-500" />
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                        {formData.phone.length > 0 && (
+                        {formData.phoneDigits.length > 0 && (
                             <p className={`text-xs mt-1 ${phoneValidation.isValid ? 'text-success-600' : 'text-danger-600'}`}>
                                 {phoneValidation.message}
                             </p>
                         )}
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Enter 9 digits after +94</p>
                     </div>
 
                     {/* Email - Optional */}
