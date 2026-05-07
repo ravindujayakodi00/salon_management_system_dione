@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SALON_NAME } from '@/config/salon';
 import { ArrowRight } from 'lucide-react';
 import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
 
 export const metadata: Metadata = {
-  title: 'Terms of Care — Dione Salon',
-  description: 'Our commitment to maintaining a professional, welcoming, and exceptional environment for every guest at Dione Salon.',
+  title: `Terms of Care — ${SALON_NAME}`,
+  description: `Our commitment to maintaining a professional, welcoming, and exceptional environment for every guest at ${SALON_NAME}.`,
 };
 
 const sections = [
@@ -36,7 +37,7 @@ const sections = [
   },
   {
     title: 'Respect & Conduct',
-    body: 'Dione Salon is a professional, inclusive space welcoming all genders and backgrounds. We ask all clients and guests to treat our team and fellow clients with courtesy and respect. We reserve the right to decline service if this standard is not upheld.',
+    body: `${SALON_NAME} is a professional, inclusive space welcoming all genders and backgrounds. We ask all clients and guests to treat our team and fellow clients with courtesy and respect. We reserve the right to decline service if this standard is not upheld.',
   },
 ];
 
@@ -65,7 +66,7 @@ export default function TermsOfCarePage() {
           <div className="max-w-7xl mx-auto px-6 lg:px-12">
             <div className="max-w-2xl">
               <p className="font-heading text-xl font-light italic text-zinc-400 leading-relaxed">
-                This is not a cold legal document. It is a guide on how we maintain the standards of care, professionalism, and respect that every Dione Salon client deserves.
+                This is not a cold legal document. It is a guide on how we maintain the standards of care, professionalism, and respect that every {SALON_NAME} client deserves.
               </p>
             </div>
           </div>

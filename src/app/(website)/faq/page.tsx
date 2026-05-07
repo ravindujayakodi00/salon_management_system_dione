@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { SALON_NAME } from '@/config/salon';
 import { ArrowRight } from 'lucide-react';
 import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
 
 const faqs = [
   {
-    question: 'What makes the Dione Salon experience different?',
+    question: `What makes the ${SALON_NAME} experience different?`,
     answer: 'We are a premium unisex salon focused on precision, quality, and a personalized experience. Every visit is tailored to your texture, face shape, and lifestyle — not a one-size-fits-all approach.',
   },
   {
@@ -17,7 +18,7 @@ const faqs = [
   },
   {
     question: 'Is the salon unisex?',
-    answer: 'Yes. Dione Salon is a fully unisex space welcoming everyone — all genders, hair types, and styles. Our team is trained to work across a wide range of techniques for any client.',
+    answer: `Yes. ${SALON_NAME} is a fully unisex space welcoming everyone — all genders, hair types, and styles. Our team is trained to work across a wide range of techniques for any client.`,
   },
   {
     question: 'How do I pay for my services?',

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { SALON_NAME } from '@/config/salon';
 import { getRateLimitKey, checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 const resend = process.env.RESEND_API_KEY
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
 
         // Send email
         const { data, error } = await resend.emails.send({
-            from: fromEmail || 'SalonFlow <onboarding@resend.dev>',
+            from: fromEmail || `${SALON_NAME} <onboarding@resend.dev>`,
             to: Array.isArray(to) ? to : [to],
             subject: subject,
             html: html,

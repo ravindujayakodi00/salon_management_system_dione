@@ -1,4 +1,5 @@
-// Dione Salon — Content & Copy
+// Salon content — edit src/config/salon.ts to change the salon name everywhere.
+import { SALON_NAME } from '@/config/salon';
 
 export interface ServiceItem {
   number: string;
@@ -13,7 +14,7 @@ export interface ServiceItem {
 }
 
 export const content = {
-  salonName: 'Dione Salon',
+  salonName: SALON_NAME,
   tagline:   'Royal Style Begins With Perfection',
 
   hero: {
@@ -129,7 +130,7 @@ export const content = {
 
   contact: {
     label:   'Find Us',
-    heading: 'Visit Dione Salon',
+    heading: `Visit ${SALON_NAME}`,
     subtext: 'Come find us or get in touch',
     address: ['75A, Colombo Road,', 'Maharagama, Sri Lanka'],
     phones:  ['+94 77 800 0440'],

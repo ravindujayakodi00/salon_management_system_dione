@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { SALON_NAME } from "@/config/salon";
 import { AuthProvider } from "@/lib/auth";
 import { ThemeProvider } from "../lib/theme";
 import "./globals.css";
@@ -10,8 +11,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "SalonFlow - Salon Management System",
-  description: "Modern salon management SaaS application for managing appointments, billing, staff, and customers",
+  title: `${SALON_NAME} - Salon Management System`,
+  description: "Modern salon management application for managing appointments, billing, staff, and customers",
 };
 
 import { ToastProvider } from '@/context/ToastContext';

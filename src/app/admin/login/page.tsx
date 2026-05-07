@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Scissors, AlertCircle } from 'lucide-react';
+import { Mail, Lock, AlertCircle } from 'lucide-react';
 import Input from '@/components/shared/Input';
 import Button from '@/components/shared/Button';
 import { adminPaths } from '@/lib/admin-paths';
@@ -93,12 +93,15 @@ export default function LoginPage() {
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ delay: 0.1, type: 'spring' }}
-                        className="inline-flex items-center justify-center w-16 h-16 bg-white dark:bg-white rounded-2xl shadow-lg mb-4"
+                        className="mb-4"
                     >
-                        <Scissors className="h-8 w-8 text-primary-600" />
+                        <span className="font-heading text-5xl font-bold tracking-tight text-primary-900 dark:text-white">
+                            DI
+                            <span className="relative mx-px inline-block h-[0.45em] w-[0.9em] rounded-full bg-[oklch(0.78_0.15_75)] align-middle" />
+                            NE
+                        </span>
                     </motion.div>
-                    <h1 className="text-4xl font-bold text-primary-900 dark:text-white mb-2">SalonFlow</h1>
-                    <p className="text-primary-600 dark:text-primary-100">Manage your salon with ease</p>
+                    <p className="text-sm tracking-wide text-primary-600 dark:text-primary-300">Royal Style Begins With Perfection</p>
                 </div>
 
                 {/* Login Card */}

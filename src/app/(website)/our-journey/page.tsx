@@ -1,13 +1,14 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
+import { SALON_NAME, SALON_SHORT_NAME } from '@/config/salon';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
 
 export const metadata: Metadata = {
-  title: 'Our Journey — Dione Salon',
-  description: 'The story behind Dione Salon — a premium unisex space built on precision, artistry, and a personal commitment to every client.',
+  title: `Our Journey — ${SALON_NAME}`,
+  description: `The story behind ${SALON_NAME} — a premium unisex space built on precision, artistry, and a personal commitment to every client.`,
 };
 
 export default function OurJourneyPage() {
@@ -39,7 +40,7 @@ export default function OurJourneyPage() {
               <div className="relative h-[380px] lg:h-[560px] w-full rounded-2xl overflow-hidden order-2 lg:order-1">
                 <Image
                   src="https://images.unsplash.com/photo-1633596683562-4a47eb4983c5?w=900&auto=format&fit=crop"
-                  alt="Dione Salon interior"
+                  alt={`${SALON_NAME} interior`}
                   fill
                   className="object-cover"
                   sizes="(max-width: 1024px) 100vw, 50vw"
@@ -60,7 +61,7 @@ export default function OurJourneyPage() {
                     Great hair is not about trends — it is about understanding who you are.
                   </p>
                   <p className="text-zinc-500 text-sm leading-relaxed">
-                    Dione Salon was founded with a single purpose: to create a premium space where every client — regardless of gender, hair type, or style — receives expert, personalised care in an environment that feels exceptional.
+                    {SALON_NAME} was founded with a single purpose: to create a premium space where every client — regardless of gender, hair type, or style — receives expert, personalised care in an environment that feels exceptional.
                   </p>
                   <p className="text-zinc-500 text-sm leading-relaxed">
                     We set out to build a salon that combined the precision of a high-end barbershop with the artistry of a luxury hair studio. A truly <strong className="text-white font-medium">unisex destination</strong> — where the only standard is excellence.
@@ -87,7 +88,7 @@ export default function OurJourneyPage() {
                 </h2>
                 <div className="space-y-5">
                   <p className="text-zinc-500 text-sm leading-relaxed">
-                    At Dione, we believe a great haircut is not a one-size-fits-all service. Every client has a unique face shape, hair texture, and lifestyle. Our job is to listen, understand, and deliver something that genuinely fits you — not just what is popular this season.
+                    At {SALON_SHORT_NAME}, we believe a great haircut is not a one-size-fits-all service. Every client has a unique face shape, hair texture, and lifestyle. Our job is to listen, understand, and deliver something that genuinely fits you — not just what is popular this season.
                   </p>
                   <p className="text-zinc-500 text-sm leading-relaxed">
                     This philosophy extends to every service we offer. Whether it is a precision cut, a complex colour transformation, or a relaxing keratin treatment, we approach each appointment with full attention and professional pride.
@@ -102,7 +103,7 @@ export default function OurJourneyPage() {
               <div className="relative h-[360px] lg:h-[500px] w-full rounded-2xl overflow-hidden">
                 <Image
                   src="https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=900&auto=format&fit=crop"
-                  alt="Precision styling at Dione Salon"
+                  alt={`Precision styling at ${SALON_NAME}`}
                   fill
                   className="object-cover"
                   sizes="(max-width: 1024px) 100vw, 50vw"
