@@ -591,7 +591,7 @@ export async function createBooking(
     service: { name: string; duration: number; price: number };
     stylist: { name: string };
 }> {
-    const orgSlug = process.env.NEXT_PUBLIC_ORGANIZATION_SLUG || 'vasanthi_salon';
+    const orgSlug = process.env.NEXT_PUBLIC_ORGANIZATION_SLUG || 'dione';
 
     const res = await fetch('/api/public/book', {
         method: 'POST',
