@@ -22,6 +22,16 @@ export default function Header({ onMenuClick }: HeaderProps) {
     const { displayName } = useBranding();
     const { branches, branchScope, setBranchScope } = useWorkspace();
     const showBranchPicker = user && user.role === 'Owner' && branches.length > 0;
+    const isSingleBranch = branches.length === 1;
+
+    // Auto-select the only branch when there's exactly one
+    useEffect(() => {
+        if (isSingleBranch && branchScope !== branches[0].id) {
+            setBranchScope(branches[0].id);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isSingleBranch, branches[0]?.id]);
+
     const assignedBranchLabel = useMemo(() => {
         if (!user?.branchId) return undefined;
         const b = branches.find(br => br.id === user.branchId);
@@ -153,9 +163,10 @@ export default function Header({ onMenuClick }: HeaderProps) {
                                         : 'all'
                                 }
                                 onChange={e => setBranchScope(e.target.value as 'all' | string)}
-                                className="text-sm border border-primary-200/80 dark:border-primary-700/50 rounded-lg px-2 py-1.5 bg-white dark:bg-primary-950/40 text-gray-900 dark:text-gray-100 max-w-[10rem] lg:max-w-[14rem] shrink-0 shadow-[var(--brand-shadow-xs)]"
+                                disabled={isSingleBranch}
+                                className="text-sm border border-primary-200/80 dark:border-primary-700/50 rounded-lg px-2 py-1.5 bg-white dark:bg-primary-950/40 text-gray-900 dark:text-gray-100 max-w-[10rem] lg:max-w-[14rem] shrink-0 shadow-[var(--brand-shadow-xs)] disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                <option value="all">All locations</option>
+                                {!isSingleBranch && <option value="all">All locations</option>}
                                 {branches.map(b => (
                                     <option key={b.id} value={b.id}>
                                         {branchPickerLabel(b, branches)}
