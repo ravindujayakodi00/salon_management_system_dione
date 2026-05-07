@@ -135,8 +135,8 @@ export async function POST(request: NextRequest) {
             // Send ONE consolidated SMS to customer
             if (customer?.phone) {
                 const msg = appointments.length === 1
-                    ? `✅ Appointment Confirmed! ${appointmentsList[0]} on ${shortDate}. See you soon! - SalonFlow`
-                    : `✅ ${appointments.length} Appointments Confirmed for ${shortDate}:\n${appointmentsList.map((apt, i) => `${i + 1}. ${apt}`).join('\n')}\nSee you soon! - SalonFlow`;
+                    ? `✅ Appointment Confirmed! ${appointmentsList[0]} on ${shortDate}. See you soon! - Dione Salon`
+                    : `✅ ${appointments.length} Appointments Confirmed for ${shortDate}:\n${appointmentsList.map((apt, i) => `${i + 1}. ${apt}`).join('\n')}\nSee you soon! - Dione Salon`;
 
                 const result = await textlk.sendSMS(customer.phone, msg);
                 results.customer = result;
@@ -194,8 +194,8 @@ export async function POST(request: NextRequest) {
                 });
 
                 const managerMsg = appointments.length === 1
-                    ? `📅 New Booking! ${customer?.name || 'Customer'} booked ${aptSummary[0]} on ${shortDate}. - SalonFlow`
-                    : `📅 ${appointments.length} New Bookings! ${customer?.name || 'Customer'} on ${shortDate}:\n${aptSummary.map((s, i) => `${i + 1}. ${s}`).join('\n')} - SalonFlow`;
+                    ? `📅 New Booking! ${customer?.name || 'Customer'} booked ${aptSummary[0]} on ${shortDate}. - Dione Salon`
+                    : `📅 ${appointments.length} New Bookings! ${customer?.name || 'Customer'} on ${shortDate}:\n${aptSummary.map((s, i) => `${i + 1}. ${s}`).join('\n')} - Dione Salon`;
 
                 for (const manager of managers) {
                     if (manager.phone) {
@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
 
             // Customer SMS
             if (customer?.phone) {
-                const msg = `🔄 Appointment Rescheduled! Your ${serviceNames} appointment has been moved to ${shortDate} at ${appointment.start_time}. See you then! - SalonFlow`;
+                const msg = `🔄 Appointment Rescheduled! Your ${serviceNames} appointment has been moved to ${shortDate} at ${appointment.start_time}. See you then! - Dione Salon`;
                 const result = await textlk.sendSMS(customer.phone, msg);
                 results.customer = result;
             }
@@ -247,7 +247,7 @@ export async function POST(request: NextRequest) {
                 .eq('organization_id', organizationId);
 
             if (managers && managers.length > 0) {
-                const managerMsg = `🔄 Appointment Rescheduled! ${customer?.name || 'Customer'}'s ${serviceNames} moved from ${oldDateStr} ${oldTimeStr} to ${shortDate} ${appointment.start_time}. - SalonFlow`;
+                const managerMsg = `🔄 Appointment Rescheduled! ${customer?.name || 'Customer'}'s ${serviceNames} moved from ${oldDateStr} ${oldTimeStr} to ${shortDate} ${appointment.start_time}. - Dione Salon`;
 
                 for (const manager of managers) {
                     if (manager.phone) {

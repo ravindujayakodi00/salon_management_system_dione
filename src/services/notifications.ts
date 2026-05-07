@@ -346,7 +346,7 @@ export const notificationsService = {
             const message = this.replaceVariables(template.message, variables);
             const subject = template.subject
                 ? this.replaceVariables(template.subject, variables)
-                : 'Notification from SalonFlow';
+                : 'Notification from Dione Salon';
 
             const results: any = {
                 email: null,

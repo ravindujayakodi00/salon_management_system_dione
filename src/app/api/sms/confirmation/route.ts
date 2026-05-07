@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
             `${i + 1}. ${apt.serviceName} - ${formatDate(apt.date)} at ${formatTime(apt.time)}`
         ).join('\n');
 
-        const message = `🎉 SalonFlow Booking Confirmed!\n\n${appointmentLines}\n\nTotal: Rs ${totalPrice.toLocaleString()}\n\nWe look forward to seeing you!`;
+        const message = `🎉 Dione Salon Booking Confirmed!\n\n${appointmentLines}\n\nTotal: Rs ${totalPrice.toLocaleString()}\n\nWe look forward to seeing you!`;
 
         // Send SMS via text.lk
         const textLkApiToken = process.env.TEXTLK_API_TOKEN;

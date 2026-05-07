@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
                 recipient: formattedPhone,
                 sender_id: textLkSenderId,
                 type: 'plain',
-                message: `Your Vasanthi Gulasekharam Salon booking verification code is: ${otp}. Valid for 5 minutes.`,
+                message: `Your Dione Salon booking verification code is: ${otp}. Valid for 5 minutes.`,
             }),
         });
 
