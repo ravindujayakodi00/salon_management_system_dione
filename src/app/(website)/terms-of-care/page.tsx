@@ -37,7 +37,7 @@ const sections = [
   },
   {
     title: 'Respect & Conduct',
-    body: `${SALON_NAME} is a professional, inclusive space welcoming all genders and backgrounds. We ask all clients and guests to treat our team and fellow clients with courtesy and respect. We reserve the right to decline service if this standard is not upheld.',
+    body: `${SALON_NAME} is a professional, inclusive space welcoming all genders and backgrounds. We ask all clients and guests to treat our team and fellow clients with courtesy and respect. We reserve the right to decline service if this standard is not upheld.`,
   },
 ];
 
