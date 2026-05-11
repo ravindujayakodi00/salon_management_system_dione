@@ -14,10 +14,12 @@ import { supabase } from '@/lib/supabase';
 import ReceiptModal from '@/components/pos/ReceiptModal';
 import { RotateCcw } from 'lucide-react';
 import { exportSalesReportToExcel } from '@/lib/excel-export';
+import { useWorkspace } from '@/lib/workspace';
 
 export default function ReportsPage() {
-    const { hasRole } = useAuth();
+    const { hasRole, user } = useAuth();
     const { showToast } = useToast();
+    const { effectiveBranchId } = useWorkspace();
     const [loading, setLoading] = useState(true);
     const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
     const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
@@ -25,7 +27,8 @@ export default function ReportsPage() {
 
     useEffect(() => {
         loadData();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.organizationId]);
 
     const loadData = async () => {
         try {
@@ -70,7 +73,7 @@ export default function ReportsPage() {
                     className={`px-4 py-2 font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'campaigns'
                         ? 'border-primary-600 text-primary-600 dark:text-primary-400'
                         : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                        }`}
+                    }`}
                 >
                     Campaign Analytics
                 </button>
@@ -79,7 +82,7 @@ export default function ReportsPage() {
                     className={`px-4 py-2 font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'invoices'
                         ? 'border-primary-600 text-primary-600 dark:text-primary-400'
                         : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                        }`}
+                    }`}
                 >
                     Invoices & Transactions
                 </button>
@@ -88,7 +91,7 @@ export default function ReportsPage() {
                     className={`px-4 py-2 font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'system_reports'
                         ? 'border-primary-600 text-primary-600 dark:text-primary-400'
                         : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                        }`}
+                    }`}
                 >
                     System Reports
                 </button>
@@ -122,7 +125,7 @@ export default function ReportsPage() {
                                     <span className={`text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1 ${(summary?.delivery_rate || 0) >= 90
                                         ? 'text-green-600 bg-green-50 dark:bg-green-900/20'
                                         : 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20'
-                                        }`}>
+                                    }`}>
                                         {summary?.delivery_rate}% Rate
                                     </span>
                                 </div>
@@ -263,6 +266,7 @@ export default function ReportsPage() {
 
 function SystemReports() {
     const { showToast } = useToast();
+    const { effectiveBranchId } = useWorkspace();
     const [downloading, setDownloading] = useState<string | null>(null);
     const [exportingExcel, setExportingExcel] = useState<string | null>(null);
 
@@ -309,7 +313,7 @@ function SystemReports() {
 
             if (reportId === 'sales_monthly') {
                 const { generateSalesReportPDF } = await import('@/lib/pdf-generator');
-                const data = await reportsService.getSalesReportData(currentMonth, currentYear);
+                const data = await reportsService.getSalesReportData(currentMonth, currentYear, effectiveBranchId);
                 generateSalesReportPDF(data);
             } else if (reportId === 'customer_growth') {
                 const { generateCustomerGrowthReportPDF } = await import('@/lib/pdf-generator');
@@ -317,7 +321,7 @@ function SystemReports() {
                 generateCustomerGrowthReportPDF(data);
             } else if (reportId === 'staff_performance') {
                 const { generateStaffPerformanceReportPDF } = await import('@/lib/pdf-generator');
-                const data = await reportsService.getStaffPerformanceReportData();
+                const data = await reportsService.getStaffPerformanceReportData(undefined, undefined, effectiveBranchId);
                 generateStaffPerformanceReportPDF(data);
             } else if (reportId === 'inventory_status') {
                 const { generateInventoryReportPDF } = await import('@/lib/pdf-generator');
@@ -376,7 +380,7 @@ function SystemReports() {
                                     try {
                                         const { reportsService } = await import('@/services/reports');
                                         const now = new Date();
-                                        const data = await reportsService.getSalesReportData(now.getMonth() + 1, now.getFullYear());
+                                        const data = await reportsService.getSalesReportData(now.getMonth() + 1, now.getFullYear(), effectiveBranchId);
                                         exportSalesReportToExcel(data);
                                         showToast('Excel file downloaded successfully!', 'success');
                                     } catch (error) {
@@ -410,25 +414,32 @@ function SystemReports() {
 }
 
 function AllInvoices() {
+    const { user } = useAuth();
+    const { effectiveBranchId } = useWorkspace();
     const [invoices, setInvoices] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
 
     useEffect(() => {
-        loadInvoices();
-    }, []);
+        void loadInvoices();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.organizationId, effectiveBranchId]);
 
     const loadInvoices = async () => {
         try {
+            if (!user?.organizationId) return;
             // Fetch last 50 invoices for the report
-            const { data, error } = await supabase
+            let q = supabase
                 .from('invoices')
                 .select(`
                     *,
                     customer:customers(*)
                 `)
+                .eq('organization_id', user.organizationId)
                 .order('created_at', { ascending: false })
                 .limit(50);
+            if (effectiveBranchId) q = q.eq('branch_id', effectiveBranchId);
+            const { data, error } = await q;
 
             if (error) throw error;
             setInvoices(data || []);
@@ -464,88 +475,88 @@ function AllInvoices() {
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead className="bg-gray-50 dark:bg-gray-700/50">
-                            <tr>
-                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Invoice</th>
-                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
-                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Customer</th>
-                                <th className="hidden lg:table-cell px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Items</th>
-                                <th className="hidden md:table-cell px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Payment Method</th>
-                                <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
-                                <th className="hidden md:table-cell px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                                <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-                            </tr>
+                        <tr>
+                            <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Invoice</th>
+                            <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                            <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Customer</th>
+                            <th className="hidden lg:table-cell px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Items</th>
+                            <th className="hidden md:table-cell px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Payment Method</th>
+                            <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
+                            <th className="hidden md:table-cell px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                            <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                        </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={8} className="px-3 sm:px-4 py-8 text-center text-sm text-gray-500">Loading invoices...</td>
-                                </tr>
-                            ) : invoices.length === 0 ? (
-                                <tr>
-                                    <td colSpan={8} className="px-3 sm:px-4 py-8 text-center text-sm text-gray-500">No invoices found</td>
-                                </tr>
-                            ) : (
-                                invoices.map((invoice) => (
-                                    <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                                        <td className="px-3 sm:px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                                            #{invoice.id.slice(0, 8)}
-                                        </td>
-                                        <td className="px-3 sm:px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                            {new Date(invoice.created_at).toLocaleDateString()}
-                                            <span className="text-xs text-gray-400 ml-1">
+                        {loading ? (
+                            <tr>
+                                <td colSpan={8} className="px-3 sm:px-4 py-8 text-center text-sm text-gray-500">Loading invoices...</td>
+                            </tr>
+                        ) : invoices.length === 0 ? (
+                            <tr>
+                                <td colSpan={8} className="px-3 sm:px-4 py-8 text-center text-sm text-gray-500">No invoices found</td>
+                            </tr>
+                        ) : (
+                            invoices.map((invoice) => (
+                                <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                    <td className="px-3 sm:px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                                        #{invoice.id.slice(0, 8)}
+                                    </td>
+                                    <td className="px-3 sm:px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                        {new Date(invoice.created_at).toLocaleDateString()}
+                                        <span className="text-xs text-gray-400 ml-1">
                                                 {new Date(invoice.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </span>
-                                        </td>
-                                        <td className="px-3 sm:px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                            {invoice.customer?.name || 'Walk-in Customer'}
-                                        </td>
-                                        <td className="hidden lg:table-cell px-3 sm:px-4 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">
-                                            {/* Handle items as JSON array */}
-                                            {Array.isArray(invoice.items) ? invoice.items.length : 0} items
-                                        </td>
-                                        <td className="hidden md:table-cell px-3 sm:px-4 py-4 whitespace-nowrap">
-                                            {(() => {
-                                                const method = invoice.payment_method || 'Cash';
-                                                const badgeColors = {
-                                                    'Cash': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-                                                    'Card': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-                                                    'BankTransfer': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-                                                    'UPI': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-                                                    'Other': 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
-                                                };
-                                                const displayNames = {
-                                                    'Cash': 'Cash',
-                                                    'Card': 'Card',
-                                                    'BankTransfer': 'Online',
-                                                    'UPI': 'UPI',
-                                                    'Other': 'Other'
-                                                };
-                                                return (
-                                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${badgeColors[method as keyof typeof badgeColors] || badgeColors.Other}`}>
+                                    </td>
+                                    <td className="px-3 sm:px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                        {invoice.customer?.name || 'Walk-in Customer'}
+                                    </td>
+                                    <td className="hidden lg:table-cell px-3 sm:px-4 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">
+                                        {/* Handle items as JSON array */}
+                                        {Array.isArray(invoice.items) ? invoice.items.length : 0} items
+                                    </td>
+                                    <td className="hidden md:table-cell px-3 sm:px-4 py-4 whitespace-nowrap">
+                                        {(() => {
+                                            const method = invoice.payment_method || 'Cash';
+                                            const badgeColors = {
+                                                'Cash': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+                                                'Card': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+                                                'BankTransfer': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+                                                'UPI': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+                                                'Other': 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
+                                            };
+                                            const displayNames = {
+                                                'Cash': 'Cash',
+                                                'Card': 'Card',
+                                                'BankTransfer': 'Online',
+                                                'UPI': 'UPI',
+                                                'Other': 'Other'
+                                            };
+                                            return (
+                                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${badgeColors[method as keyof typeof badgeColors] || badgeColors.Other}`}>
                                                         {displayNames[method as keyof typeof displayNames] || method}
                                                     </span>
-                                                );
-                                            })()}
-                                        </td>
-                                        <td className="px-3 sm:px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
-                                            LKR {invoice.total.toLocaleString()}
-                                        </td>
-                                        <td className="hidden md:table-cell px-3 sm:px-4 py-4 whitespace-nowrap">
+                                            );
+                                        })()}
+                                    </td>
+                                    <td className="px-3 sm:px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
+                                        LKR {invoice.total.toLocaleString()}
+                                    </td>
+                                    <td className="hidden md:table-cell px-3 sm:px-4 py-4 whitespace-nowrap">
                                             <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
                                                 Paid
                                             </span>
-                                        </td>
-                                        <td className="px-3 sm:px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button
-                                                onClick={() => setSelectedInvoice(invoice)}
-                                                className="text-primary-600 hover:text-primary-900 dark:text-primary-400 dark:hover:text-primary-300"
-                                            >
-                                                View
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
+                                    </td>
+                                    <td className="px-3 sm:px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button
+                                            onClick={() => setSelectedInvoice(invoice)}
+                                            className="text-primary-600 hover:text-primary-900 dark:text-primary-400 dark:hover:text-primary-300"
+                                        >
+                                            View
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                         </tbody>
                     </table>
                 </div>

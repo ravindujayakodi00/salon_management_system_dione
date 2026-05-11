@@ -46,7 +46,7 @@ export default function POSPage() {
     const [customerSearch, setCustomerSearch] = useState('');
     const [serviceSearch, setServiceSearch] = useState('');
     const [processingPayment, setProcessingPayment] = useState(false);
-    const [manualItem, setManualItem] = useState({ description: '', price: '' });
+    const [manualItem, setManualItem] = useState({ description: '', price: '', stylistId: '' });
 
     // Appointment integration state
     const [customerAppointments, setCustomerAppointments] = useState<any[]>([]);
@@ -216,13 +216,15 @@ export default function POSPage() {
     const fetchStaff = async () => {
         if (!user?.organizationId) return;
         try {
-            const { data, error } = await supabase
+            let q = supabase
                 .from('staff')
                 .select('id, name, role')
                 .eq('organization_id', user.organizationId)
                 .eq('is_active', true)
                 .eq('role', 'Stylist')
                 .order('name');
+            if (effectiveBranchId) q = q.eq('branch_id', effectiveBranchId);
+            const { data, error } = await q;
 
             if (error) throw error;
             setStaff(data || []);
@@ -428,16 +430,27 @@ export default function POSPage() {
             showToast('Please enter description and price', 'warning');
             return;
         }
+        if (!manualItem.stylistId) {
+            showToast('Please select the stylist who provided this service', 'warning');
+            return;
+        }
+        const stylist = staff.find(s => s.id === manualItem.stylistId);
+        if (!stylist) {
+            showToast('Invalid stylist selected', 'error');
+            return;
+        }
         setCart([...cart, {
             type: 'manual',
             name: manualItem.description,
             price: parseFloat(manualItem.price),
             quantity: 1,
-            description: manualItem.description
+            description: manualItem.description,
+            stylistId: manualItem.stylistId,
+            stylistName: stylist?.name,
         }]);
-        setManualItem({ description: '', price: '' });
+        setManualItem({ description: '', price: '', stylistId: '' });
         setShowManualFee(false);
-        showToast('Manual item added', 'success');
+        showToast(`Manual item added (Stylist: ${stylist?.name})`, 'success');
     };
 
     const addLoyaltyCardToCart = () => {
@@ -855,792 +868,804 @@ export default function POSPage() {
 
     return (
         <>
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">POS & Billing</h1>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1">Process payments and generate invoices</p>
+            <div className="space-y-6">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">POS & Billing</h1>
+                        <p className="text-gray-600 dark:text-gray-400 mt-1">Process payments and generate invoices</p>
+                    </div>
+                    {lastInvoice && (
+                        <Button variant="outline" onClick={() => setShowReceipt(true)} leftIcon={<Printer className="h-4 w-4" />}>
+                            Last Receipt
+                        </Button>
+                    )}
                 </div>
-                {lastInvoice && (
-                    <Button variant="outline" onClick={() => setShowReceipt(true)} leftIcon={<Printer className="h-4 w-4" />}>
-                        Last Receipt
-                    </Button>
-                )}
-            </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-                {/* Left: Customer & Selection */}
-                <div className="xl:col-span-2 space-y-4">
-                    {/* Customer Search */}
-                    <div className="card p-4 surface-panel">
-                        <h2 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3 uppercase tracking-wide">Step 1: Select Customer</h2>
-                        <div className="relative">
-                            <Input
-                                type="text"
-                                placeholder="Search by phone or name..."
-                                value={customerSearch}
-                                onChange={(e) => setCustomerSearch(e.target.value)}
-                                leftIcon={<Search className="h-5 w-5" />}
-                            />
-                            {customerSearch.length > 2 && (
-                                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-                                    {customers.length > 0 ? (
-                                        customers.map(customer => (
-                                            <button
-                                                key={customer.id}
-                                                className="w-full p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-0"
-                                                onClick={() => {
-                                                    setSelectedCustomer(customer);
-                                                    setCustomerSearch('');
-                                                    setCustomers([]);
-                                                }}
-                                            >
-                                                <p className="font-medium text-gray-900 dark:text-white">{customer.name}</p>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400">{customer.phone}</p>
-                                            </button>
-                                        ))
-                                    ) : (
-                                        <div className="p-4">
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 text-center">
-                                                No customer found
-                                            </p>
-                                            <button
-                                                onClick={() => {
-                                                    // Open modal with phone number pre-filled
-                                                    const phone = customerSearch.replace(/\D/g, '');
-                                                    if (phone.length >= 9) {
-                                                        setPendingPhone(phone);
-                                                        setShowCustomerForm(true);
-                                                    } else {
-                                                        showToast('Please enter a valid phone number', 'warning');
-                                                    }
-                                                }}
-                                                className="w-full p-3 bg-primary-500 hover:bg-primary-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
-                                            >
-                                                <Plus className="h-4 w-4" />
-                                                Create Walk-in Customer
-                                            </button>
-                                        </div>
-                                    )}
+                <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+                    {/* Left: Customer & Selection */}
+                    <div className="xl:col-span-2 space-y-4">
+                        {/* Customer Search */}
+                        <div className="card p-4 surface-panel">
+                            <h2 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3 uppercase tracking-wide">Step 1: Select Customer</h2>
+                            <div className="relative">
+                                <Input
+                                    type="text"
+                                    placeholder="Search by phone or name..."
+                                    value={customerSearch}
+                                    onChange={(e) => setCustomerSearch(e.target.value)}
+                                    leftIcon={<Search className="h-5 w-5" />}
+                                />
+                                {customerSearch.length > 2 && (
+                                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                                        {customers.length > 0 ? (
+                                            customers.map(customer => (
+                                                <button
+                                                    key={customer.id}
+                                                    className="w-full p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-0"
+                                                    onClick={() => {
+                                                        setSelectedCustomer(customer);
+                                                        setCustomerSearch('');
+                                                        setCustomers([]);
+                                                    }}
+                                                >
+                                                    <p className="font-medium text-gray-900 dark:text-white">{customer.name}</p>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">{customer.phone}</p>
+                                                </button>
+                                            ))
+                                        ) : (
+                                            <div className="p-4">
+                                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 text-center">
+                                                    No customer found
+                                                </p>
+                                                <button
+                                                    onClick={() => {
+                                                        // Open modal with phone number pre-filled
+                                                        const phone = customerSearch.replace(/\D/g, '');
+                                                        if (phone.length >= 9) {
+                                                            setPendingPhone(phone);
+                                                            setShowCustomerForm(true);
+                                                        } else {
+                                                            showToast('Please enter a valid phone number', 'warning');
+                                                        }
+                                                    }}
+                                                    className="w-full p-3 bg-primary-500 hover:bg-primary-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+                                                >
+                                                    <Plus className="h-4 w-4" />
+                                                    Create Walk-in Customer
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            {selectedCustomer && (
+                                <div className="mt-3 p-3 bg-primary-50 dark:bg-primary-900/20 rounded-xl flex justify-between items-center">
+                                    <div>
+                                        <p className="font-medium text-primary-900 dark:text-primary-100">{selectedCustomer.name}</p>
+                                        <p className="text-sm text-primary-700 dark:text-primary-300">{selectedCustomer.phone}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            setSelectedCustomer(null);
+                                            setCustomerSearch('');
+                                            setCustomerAppointments([]);
+                                            setCart([]);
+                                        }}
+                                        className="text-primary-600 hover:text-primary-800 text-sm font-medium"
+                                    >
+                                        Change
+                                    </button>
                                 </div>
                             )}
                         </div>
+
+                        {/* Today's Appointments */}
                         {selectedCustomer && (
-                            <div className="mt-3 p-3 bg-primary-50 dark:bg-primary-900/20 rounded-xl flex justify-between items-center">
-                                <div>
-                                    <p className="font-medium text-primary-900 dark:text-primary-100">{selectedCustomer.name}</p>
-                                    <p className="text-sm text-primary-700 dark:text-primary-300">{selectedCustomer.phone}</p>
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        setSelectedCustomer(null);
-                                        setCustomerSearch('');
-                                        setCustomerAppointments([]);
-                                        setCart([]);
-                                    }}
-                                    className="text-primary-600 hover:text-primary-800 text-sm font-medium"
-                                >
-                                    Change
-                                </button>
-                            </div>
-                        )}
-                    </div>
+                            <div className="card p-4 surface-panel">
+                                <h2 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3 uppercase tracking-wide flex items-center gap-2">
+                                    <Calendar className="h-4 w-4" />
+                                    Step 2: Today's Appointments
+                                </h2>
 
-                    {/* Today's Appointments */}
-                    {selectedCustomer && (
-                        <div className="card p-4 surface-panel">
-                            <h2 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3 uppercase tracking-wide flex items-center gap-2">
-                                <Calendar className="h-4 w-4" />
-                                Step 2: Today's Appointments
-                            </h2>
+                                {loadingAppointments ? (
+                                    <div className="flex items-center justify-center py-6">
+                                        <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary-600 border-t-transparent"></div>
+                                    </div>
+                                ) : customerAppointments.length === 0 ? (
+                                    <div className="text-center py-6 bg-gray-50 dark:bg-gray-700/30 rounded-xl">
+                                        <Calendar className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                                        <p className="text-gray-500 dark:text-gray-400">No appointments for today</p>
+                                        <p className="text-xs text-gray-400 mt-1">Add services manually below</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {customerAppointments.map(appointment => {
+                                            const inCart = isAppointmentInCart(appointment.id);
+                                            const appointmentTotal = appointment.services_data?.reduce((sum: number, s: any) => sum + s.price, 0) || 0;
 
-                            {loadingAppointments ? (
-                                <div className="flex items-center justify-center py-6">
-                                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary-600 border-t-transparent"></div>
-                                </div>
-                            ) : customerAppointments.length === 0 ? (
-                                <div className="text-center py-6 bg-gray-50 dark:bg-gray-700/30 rounded-xl">
-                                    <Calendar className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                                    <p className="text-gray-500 dark:text-gray-400">No appointments for today</p>
-                                    <p className="text-xs text-gray-400 mt-1">Add services manually below</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {customerAppointments.map(appointment => {
-                                        const inCart = isAppointmentInCart(appointment.id);
-                                        const appointmentTotal = appointment.services_data?.reduce((sum: number, s: any) => sum + s.price, 0) || 0;
-
-                                        return (
-                                            <motion.div
-                                                key={appointment.id}
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                className={`p-3 rounded-xl border-2 transition-all ${inCart
-                                                    ? 'border-success-500 bg-success-50 dark:bg-success-900/20'
-                                                    : 'border-gray-200 dark:border-gray-700 hover:border-primary-400 cursor-pointer'
+                                            return (
+                                                <motion.div
+                                                    key={appointment.id}
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    className={`p-3 rounded-xl border-2 transition-all ${inCart
+                                                        ? 'border-success-500 bg-success-50 dark:bg-success-900/20'
+                                                        : 'border-gray-200 dark:border-gray-700 hover:border-primary-400 cursor-pointer'
                                                     }`}
-                                                onClick={() => !inCart && addAppointmentToCart(appointment)}
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-3">
-                                                        {inCart ? (
-                                                            <CheckCircle className="h-5 w-5 text-success-600" />
-                                                        ) : (
-                                                            <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600" />
-                                                        )}
-                                                        <div>
-                                                            <div className="flex items-center gap-2">
-                                                                <Clock className="h-3.5 w-3.5 text-gray-500" />
-                                                                <span className="font-medium text-gray-900 dark:text-white">{appointment.start_time}</span>
-                                                                <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">{appointment.duration}min</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-1 mt-0.5">
-                                                                <User className="h-3 w-3 text-gray-400" />
-                                                                <span className="text-xs text-gray-500">{appointment.stylist?.name || 'No stylist'}</span>
+                                                    onClick={() => !inCart && addAppointmentToCart(appointment)}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-3">
+                                                            {inCart ? (
+                                                                <CheckCircle className="h-5 w-5 text-success-600" />
+                                                            ) : (
+                                                                <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600" />
+                                                            )}
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <Clock className="h-3.5 w-3.5 text-gray-500" />
+                                                                    <span className="font-medium text-gray-900 dark:text-white">{appointment.start_time}</span>
+                                                                    <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">{appointment.duration}min</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-1 mt-0.5">
+                                                                    <User className="h-3 w-3 text-gray-400" />
+                                                                    <span className="text-xs text-gray-500">{appointment.stylist?.name || 'No stylist'}</span>
+                                                                </div>
                                                             </div>
                                                         </div>
+                                                        <div className="text-right">
+                                                            <p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(appointmentTotal)}</p>
+                                                            <p className="text-xs text-gray-500">{appointment.services_data?.length || 0} service(s)</p>
+                                                        </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(appointmentTotal)}</p>
-                                                        <p className="text-xs text-gray-500">{appointment.services_data?.length || 0} service(s)</p>
-                                                    </div>
-                                                </div>
-                                                {!inCart && (
-                                                    <>
-                                                        <div className="mt-2 flex flex-wrap gap-1">
-                                                            {appointment.services_data?.map((s: any) => (
-                                                                <span key={s.id} className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300">
+                                                    {!inCart && (
+                                                        <>
+                                                            <div className="mt-2 flex flex-wrap gap-1">
+                                                                {appointment.services_data?.map((s: any) => (
+                                                                    <span key={s.id} className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300">
                                                                     {s.name}
                                                                 </span>
-                                                            ))}
-                                                        </div>
-                                                        {/* Additional Fee Input */}
-                                                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600" onClick={(e) => e.stopPropagation()}>
-                                                            <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">💰 Optional Additional Fee</p>
-                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                                <Input
-                                                                    type="number"
-                                                                    placeholder="Fee amount"
-                                                                    value={appointmentAdditionalFees.get(appointment.id)?.fee || ''}
-                                                                    onChange={(e) => {
-                                                                        const newFees = new Map(appointmentAdditionalFees);
-                                                                        const existing = newFees.get(appointment.id) || { fee: 0, reason: '' };
-                                                                        newFees.set(appointment.id, {
-                                                                            ...existing,
-                                                                            fee: parseFloat(e.target.value) || 0
-                                                                        });
-                                                                        setAppointmentAdditionalFees(newFees);
-                                                                    }}
-                                                                    min="0"
-                                                                    step="10"
-                                                                    className="text-sm"
-                                                                />
-                                                                <Input
-                                                                    type="text"
-                                                                    placeholder="Reason (optional)"
-                                                                    value={appointmentAdditionalFees.get(appointment.id)?.reason || ''}
-                                                                    onChange={(e) => {
-                                                                        const newFees = new Map(appointmentAdditionalFees);
-                                                                        const existing = newFees.get(appointment.id) || { fee: 0, reason: '' };
-                                                                        newFees.set(appointment.id, {
-                                                                            ...existing,
-                                                                            reason: e.target.value
-                                                                        });
-                                                                        setAppointmentAdditionalFees(newFees);
-                                                                    }}
-                                                                    className="text-sm"
-                                                                />
+                                                                ))}
                                                             </div>
+                                                            {/* Additional Fee Input */}
+                                                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600" onClick={(e) => e.stopPropagation()}>
+                                                                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">💰 Optional Additional Fee</p>
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                                    <Input
+                                                                        type="number"
+                                                                        placeholder="Fee amount"
+                                                                        value={appointmentAdditionalFees.get(appointment.id)?.fee || ''}
+                                                                        onChange={(e) => {
+                                                                            const newFees = new Map(appointmentAdditionalFees);
+                                                                            const existing = newFees.get(appointment.id) || { fee: 0, reason: '' };
+                                                                            newFees.set(appointment.id, {
+                                                                                ...existing,
+                                                                                fee: parseFloat(e.target.value) || 0
+                                                                            });
+                                                                            setAppointmentAdditionalFees(newFees);
+                                                                        }}
+                                                                        min="0"
+                                                                        step="10"
+                                                                        className="text-sm"
+                                                                    />
+                                                                    <Input
+                                                                        type="text"
+                                                                        placeholder="Reason (optional)"
+                                                                        value={appointmentAdditionalFees.get(appointment.id)?.reason || ''}
+                                                                        onChange={(e) => {
+                                                                            const newFees = new Map(appointmentAdditionalFees);
+                                                                            const existing = newFees.get(appointment.id) || { fee: 0, reason: '' };
+                                                                            newFees.set(appointment.id, {
+                                                                                ...existing,
+                                                                                reason: e.target.value
+                                                                            });
+                                                                            setAppointmentAdditionalFees(newFees);
+                                                                        }}
+                                                                        className="text-sm"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </motion.div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Loyalty (single active program from Settings) */}
+                        {selectedCustomer && loyaltyInfo && loyaltyMode !== 'none' && (
+                            <div className="card p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800">
+                                <h2 className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-3 uppercase tracking-wide flex items-center gap-2">
+                                    Loyalty
+                                </h2>
+
+                                {loyaltyLoading ? (
+                                    <div className="flex items-center justify-center py-4">
+                                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-amber-600 border-t-transparent"></div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {loyaltyMode === 'card' && (
+                                            <>
+                                                <div className="flex items-center justify-between p-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-lg" aria-hidden>🎫</span>
+                                                        <div>
+                                                            <p className="text-sm font-medium text-gray-900 dark:text-white">Loyalty card</p>
+                                                            {loyaltyInfo.cardValid ? (
+                                                                <p className="text-xs text-green-600">Active • {loyaltyInfo.cardDiscount}% off services</p>
+                                                            ) : (
+                                                                <p className="text-xs text-gray-500">No active card — sell one below or on this bill</p>
+                                                            )}
                                                         </div>
-                                                    </>
+                                                    </div>
+                                                    {loyaltyInfo.cardValid && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setLoyaltyType('card');
+                                                                setLoyaltyDiscount((subtotal * loyaltyInfo.cardDiscount) / 100);
+                                                                showToast(`Card discount ${loyaltyInfo.cardDiscount}% applied`, 'success');
+                                                            }}
+                                                            disabled={loyaltyType === 'card'}
+                                                            className={`px-2 py-1 text-xs rounded-lg transition-colors ${loyaltyType === 'card' ? 'bg-green-500 text-white' : 'bg-amber-500 text-white hover:bg-amber-600'}`}
+                                                        >
+                                                            {loyaltyType === 'card' ? 'Applied' : 'Apply discount'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                {!loyaltyInfo.cardValid && (
+                                                    <div className="p-3 rounded-lg bg-white/80 dark:bg-gray-800/80 border border-amber-200/80 dark:border-amber-800/50">
+                                                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                                                            Sell a card ({formatCurrency(loyaltyInfo.settings.card_price)}) — customer gets{' '}
+                                                            {loyaltyInfo.settings.card_discount_percent}% off for {loyaltyInfo.settings.card_validity_days} days after purchase.
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 mb-2">In stock: {loyaltyCardStock}</p>
+                                                        <Button
+                                                            type="button"
+                                                            variant="primary"
+                                                            size="sm"
+                                                            className="w-full"
+                                                            onClick={addLoyaltyCardToCart}
+                                                            disabled={loyaltyCardStock < 1 || cart.some((i: { loyaltyCardPurchase?: boolean }) => i.loyaltyCardPurchase)}
+                                                        >
+                                                            {cart.some((i: { loyaltyCardPurchase?: boolean }) => i.loyaltyCardPurchase)
+                                                                ? 'Card on bill'
+                                                                : 'Add loyalty card to bill'}
+                                                        </Button>
+                                                    </div>
                                                 )}
-                                            </motion.div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    )}
+                                            </>
+                                        )}
 
-                    {/* Loyalty (single active program from Settings) */}
-                    {selectedCustomer && loyaltyInfo && loyaltyMode !== 'none' && (
-                        <div className="card p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800">
-                            <h2 className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-3 uppercase tracking-wide flex items-center gap-2">
-                                Loyalty
-                            </h2>
-
-                            {loyaltyLoading ? (
-                                <div className="flex items-center justify-center py-4">
-                                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-amber-600 border-t-transparent"></div>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {loyaltyMode === 'card' && (
-                                        <>
+                                        {loyaltyMode === 'points' && (
                                             <div className="flex items-center justify-between p-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-lg" aria-hidden>🎫</span>
+                                                    <span className="text-lg" aria-hidden>⭐</span>
                                                     <div>
-                                                        <p className="text-sm font-medium text-gray-900 dark:text-white">Loyalty card</p>
-                                                        {loyaltyInfo.cardValid ? (
-                                                            <p className="text-xs text-green-600">Active • {loyaltyInfo.cardDiscount}% off services</p>
-                                                        ) : (
-                                                            <p className="text-xs text-gray-500">No active card — sell one below or on this bill</p>
-                                                        )}
+                                                        <p className="text-sm font-medium text-gray-900 dark:text-white">Points</p>
+                                                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                                                            {loyaltyInfo.availablePoints} pts ({formatCurrency(loyaltyInfo.pointsValue)} value)
+                                                        </p>
                                                     </div>
                                                 </div>
-                                                {loyaltyInfo.cardValid && (
+                                                {loyaltyInfo.availablePoints > 0 && (
                                                     <button
                                                         type="button"
                                                         onClick={() => {
-                                                            setLoyaltyType('card');
-                                                            setLoyaltyDiscount((subtotal * loyaltyInfo.cardDiscount) / 100);
-                                                            showToast(`Card discount ${loyaltyInfo.cardDiscount}% applied`, 'success');
+                                                            setLoyaltyType('points');
+                                                            setPointsToRedeem(loyaltyInfo.availablePoints);
+                                                            const discountAmt = Math.min(loyaltyInfo.pointsValue, subtotal);
+                                                            setLoyaltyDiscount(discountAmt);
+                                                            showToast(`Redeeming ${loyaltyInfo.availablePoints} points for ${formatCurrency(discountAmt)}`, 'success');
                                                         }}
-                                                        disabled={loyaltyType === 'card'}
-                                                        className={`px-2 py-1 text-xs rounded-lg transition-colors ${loyaltyType === 'card' ? 'bg-green-500 text-white' : 'bg-amber-500 text-white hover:bg-amber-600'}`}
+                                                        disabled={loyaltyType === 'points'}
+                                                        className={`px-2 py-1 text-xs rounded-lg transition-colors ${loyaltyType === 'points' ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
                                                     >
-                                                        {loyaltyType === 'card' ? 'Applied' : 'Apply discount'}
+                                                        {loyaltyType === 'points' ? 'Applied' : 'Redeem'}
                                                     </button>
                                                 )}
                                             </div>
-                                            {!loyaltyInfo.cardValid && (
-                                                <div className="p-3 rounded-lg bg-white/80 dark:bg-gray-800/80 border border-amber-200/80 dark:border-amber-800/50">
-                                                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                                                        Sell a card ({formatCurrency(loyaltyInfo.settings.card_price)}) — customer gets{' '}
-                                                        {loyaltyInfo.settings.card_discount_percent}% off for {loyaltyInfo.settings.card_validity_days} days after purchase.
-                                                    </p>
-                                                    <p className="text-xs text-gray-500 mb-2">In stock: {loyaltyCardStock}</p>
-                                                    <Button
-                                                        type="button"
-                                                        variant="primary"
-                                                        size="sm"
-                                                        className="w-full"
-                                                        onClick={addLoyaltyCardToCart}
-                                                        disabled={loyaltyCardStock < 1 || cart.some((i: { loyaltyCardPurchase?: boolean }) => i.loyaltyCardPurchase)}
-                                                    >
-                                                        {cart.some((i: { loyaltyCardPurchase?: boolean }) => i.loyaltyCardPurchase)
-                                                            ? 'Card on bill'
-                                                            : 'Add loyalty card to bill'}
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
+                                        )}
 
-                                    {loyaltyMode === 'points' && (
-                                        <div className="flex items-center justify-between p-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-lg" aria-hidden>⭐</span>
-                                                <div>
-                                                    <p className="text-sm font-medium text-gray-900 dark:text-white">Points</p>
-                                                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                                                        {loyaltyInfo.availablePoints} pts ({formatCurrency(loyaltyInfo.pointsValue)} value)
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            {loyaltyInfo.availablePoints > 0 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setLoyaltyType('points');
-                                                        setPointsToRedeem(loyaltyInfo.availablePoints);
-                                                        const discountAmt = Math.min(loyaltyInfo.pointsValue, subtotal);
-                                                        setLoyaltyDiscount(discountAmt);
-                                                        showToast(`Redeeming ${loyaltyInfo.availablePoints} points for ${formatCurrency(discountAmt)}`, 'success');
-                                                    }}
-                                                    disabled={loyaltyType === 'points'}
-                                                    className={`px-2 py-1 text-xs rounded-lg transition-colors ${loyaltyType === 'points' ? 'bg-green-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-                                                >
-                                                    {loyaltyType === 'points' ? 'Applied' : 'Redeem'}
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {loyaltyMode === 'visits' && (
-                                        <div className="flex items-center justify-between p-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-lg" aria-hidden>🎯</span>
-                                                <div>
-                                                    <p className="text-sm font-medium text-gray-900 dark:text-white">Visit rewards</p>
-                                                    {loyaltyInfo.eligibleForVisitReward ? (
-                                                        <p className="text-xs text-green-600">{loyaltyInfo.visitRewardDiscount}% off this visit</p>
-                                                    ) : (
-                                                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                                                            {loyaltyInfo.totalVisits} visits • {loyaltyInfo.nextRewardVisit} more until reward
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            {loyaltyInfo.eligibleForVisitReward && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setLoyaltyType('visit');
-                                                        setLoyaltyDiscount((subtotal * loyaltyInfo.visitRewardDiscount) / 100);
-                                                        showToast(`Visit reward ${loyaltyInfo.visitRewardDiscount}% applied`, 'success');
-                                                    }}
-                                                    disabled={loyaltyType === 'visit'}
-                                                    className={`px-2 py-1 text-xs rounded-lg transition-colors ${loyaltyType === 'visit' ? 'bg-green-500 text-white' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
-                                                >
-                                                    {loyaltyType === 'visit' ? 'Applied' : 'Apply'}
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {loyaltyType !== 'none' && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setLoyaltyType('none');
-                                                setLoyaltyDiscount(0);
-                                                setPointsToRedeem(0);
-                                                showToast('Loyalty discount removed', 'info');
-                                            }}
-                                            className="w-full mt-2 text-xs text-gray-500 hover:text-gray-700 underline"
-                                        >
-                                            Clear loyalty discount
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-
-
-                    {/* Manual Fee (Collapsible) */}
-                    {selectedCustomer && (
-                        <div className="card surface-panel overflow-hidden">
-                            <button
-                                onClick={() => setShowManualFee(!showManualFee)}
-                                className="w-full p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                            >
-                                <span className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                                    💵 Add Manual Fee
-                                </span>
-                                {showManualFee ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                            </button>
-                            <AnimatePresence>
-                                {showManualFee && (
-                                    <motion.div
-                                        initial={{ height: 0 }}
-                                        animate={{ height: 'auto' }}
-                                        exit={{ height: 0 }}
-                                        className="overflow-hidden"
-                                    >
-                                        <div className="p-4 pt-0 border-t border-gray-100 dark:border-gray-700 space-y-3">
-                                            <Input
-                                                placeholder="Description"
-                                                value={manualItem.description}
-                                                onChange={(e) => setManualItem({ ...manualItem, description: e.target.value })}
-                                            />
-                                            <div className="flex flex-col sm:flex-row gap-2">
-                                                <Input
-                                                    type="number"
-                                                    placeholder="Amount"
-                                                    value={manualItem.price}
-                                                    onChange={(e) => setManualItem({ ...manualItem, price: e.target.value })}
-                                                />
-                                                <Button variant="primary" size="sm" onClick={addManualItem}>
-                                                    Add
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                    )}
-
-                    {/* Walk-in Services Panel */}
-                    {selectedCustomer && (
-                        <WalkInServicesPanel
-                            services={services}
-                            staff={staff}
-                            selectedStylistForService={selectedStylistForService}
-                            onStylistChange={(serviceId, stylistId) => {
-                                const newMap = new Map(selectedStylistForService);
-                                newMap.set(serviceId, stylistId);
-                                setSelectedStylistForService(newMap);
-                            }}
-                            onAddService={addWalkInServiceToCart}
-                        />
-                    )}
-                </div>
-
-                {/* Right: Bill Summary - At bottom on tablet, right side on desktop */}
-                <div className="xl:col-span-3">
-                    <div className="card p-4 sm:p-6 surface-panel xl:sticky xl:top-24">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                <ShoppingCart className="h-5 w-5 text-primary-600" />
-                                Bill Summary
-                            </h2>
-                            {cart.length > 0 && (
-                                <button
-                                    onClick={clearCart}
-                                    className="text-sm text-danger-600 hover:text-danger-700 flex items-center gap-1"
-                                >
-                                    <RotateCcw className="h-3 w-3" /> Clear
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Bill Items */}
-                        <div className="space-y-4 mb-6 max-h-[40vh] overflow-y-auto">
-                            {cart.length === 0 ? (
-                                <div className="text-center py-12 bg-gray-50 dark:bg-gray-700/30 rounded-xl">
-                                    <ShoppingCart className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                                    <p className="text-gray-500 dark:text-gray-400">No items in bill</p>
-                                    <p className="text-xs text-gray-400 mt-1">Select a customer and add appointments</p>
-                                </div>
-                            ) : (
-                                <>
-                                    {/* Appointment Groups */}
-                                    {Object.entries(appointmentGroups).map(([aptId, group]) => (
-                                        <div key={aptId} className="bg-gradient-to-r from-primary-50 to-transparent dark:from-primary-900/20 rounded-xl p-4 border border-primary-200 dark:border-primary-800">
-                                            <div className="flex items-center justify-between mb-3">
+                                        {loyaltyMode === 'visits' && (
+                                            <div className="flex items-center justify-between p-2 bg-white/60 dark:bg-gray-800/60 rounded-lg">
                                                 <div className="flex items-center gap-2">
-                                                    <Calendar className="h-4 w-4 text-primary-600" />
-                                                    <span className="text-sm font-medium text-primary-800 dark:text-primary-200">
-                                                        Appointment at {group.appointment.start_time}
-                                                    </span>
-                                                    <span className="text-xs bg-primary-200 dark:bg-primary-800 px-2 py-0.5 rounded text-primary-700 dark:text-primary-300">
-                                                        {group.items[0]?.stylistName}
-                                                    </span>
+                                                    <span className="text-lg" aria-hidden>🎯</span>
+                                                    <div>
+                                                        <p className="text-sm font-medium text-gray-900 dark:text-white">Visit rewards</p>
+                                                        {loyaltyInfo.eligibleForVisitReward ? (
+                                                            <p className="text-xs text-green-600">{loyaltyInfo.visitRewardDiscount}% off this visit</p>
+                                                        ) : (
+                                                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                                                                {loyaltyInfo.totalVisits} visits • {loyaltyInfo.nextRewardVisit} more until reward
+                                                            </p>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <button
-                                                    onClick={() => removeAppointmentFromCart(aptId)}
-                                                    className="text-primary-600 hover:text-danger-600 transition-colors"
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                            <div className="space-y-2">
-                                                {group.items.map((item: any) => (
-                                                    <div key={item.index} className="flex justify-between items-center text-sm">
-                                                        <span className="text-gray-700 dark:text-gray-300">{item.name}</span>
-                                                        <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(item.price)}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className="mt-2 pt-2 border-t border-primary-200 dark:border-primary-700 flex justify-between font-medium">
-                                                <span className="text-primary-800 dark:text-primary-200">Subtotal</span>
-                                                <span className="text-primary-900 dark:text-primary-100">
-                                                    {formatCurrency(group.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0))}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))}
-
-                                    {/* Extra Items */}
-                                    {extraItems.length > 0 && (
-                                        <div className="bg-gray-50 dark:bg-gray-700/30 rounded-xl p-4">
-                                            <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">
-                                                Extra Services
-                                            </div>
-                                            <div className="space-y-2">
-                                                {extraItems.map((item: any) => (
-                                                    <div key={item.index} className="flex justify-between items-center">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="flex-1">
-                                                                <span className="text-gray-900 dark:text-white">{item.name}</span>
-                                                                {item.type === 'walk-in-service' && item.stylistName && (
-                                                                    <div className="flex items-center gap-1 mt-0.5">
-                                                                        <User className="h-3 w-3 text-primary-500" />
-                                                                        <span className="text-xs text-primary-600 dark:text-primary-400">
-                                                                            {item.stylistName}
-                                                                        </span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex items-center gap-1 text-xs">
-                                                                <button
-                                                                    onClick={() => updateItemQuantity(item.index, -1)}
-                                                                    className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-600 hover:bg-gray-300"
-                                                                >-</button>
-                                                                <span className="w-6 text-center">{item.quantity}</span>
-                                                                <button
-                                                                    onClick={() => updateItemQuantity(item.index, 1)}
-                                                                    className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-600 hover:bg-gray-300"
-                                                                >+</button>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-medium">{formatCurrency(item.price * item.quantity)}</span>
-                                                            <button onClick={() => removeFromCart(item.index)} className="text-gray-400 hover:text-danger-500">
-                                                                <X className="h-4 w-4" />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                        </div>
-
-                        {/* Discount Section */}
-                        {cart.length > 0 && (
-                            <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700/30 rounded-xl space-y-3">
-                                <label className="text-xs font-medium text-gray-500 mb-2 block">Discount</label>
-
-                                {/* Manual Discount Input */}
-                                <div>
-                                    <label className="text-xs text-gray-500 mb-1 block">Manual Discount (%)</label>
-                                    <Input
-                                        type="number"
-                                        value={selectedCoupon ? '' : discountInput}
-                                        onChange={(e) => {
-                                            setDiscountInput(e.target.value);
-                                        }}
-                                        onBlur={(e) => {
-                                            const percentage = parseFloat(e.target.value) || 0;
-                                            const clampedPercentage = Math.min(Math.max(percentage, 0), 100);
-                                            const discountAmount = (subtotal * clampedPercentage) / 100;
-                                            setDiscount(discountAmount);
-                                        }}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                const percentage = parseFloat((e.target as HTMLInputElement).value) || 0;
-                                                const clampedPercentage = Math.min(Math.max(percentage, 0), 100);
-                                                const discountAmount = (subtotal * clampedPercentage) / 100;
-                                                setDiscount(discountAmount);
-                                            }
-                                        }}
-                                        placeholder="0"
-                                        min="0"
-                                        max="100"
-                                        step="any"
-                                        disabled={!!selectedCoupon}
-                                        className="text-sm"
-                                    />
-                                    {discount > 0 && !selectedCoupon && (
-                                        <p className="text-xs text-success-600 mt-1">
-                                            Discount: {formatCurrency(discount)}
-                                        </p>
-                                    )}
-                                </div>
-
-                                {/* Divider */}
-                                <div className="relative">
-                                    <div className="absolute inset-0 flex items-center">
-                                        <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
-                                    </div>
-                                    <div className="relative flex justify-center text-xs">
-                                        <span className="bg-gray-50 dark:bg-gray-700/30 px-2 text-gray-500">or use promo code</span>
-                                    </div>
-                                </div>
-
-                                {/* Promo Code Selector */}
-                                {selectedCoupon ? (
-                                    <div className="flex items-center justify-between bg-success-50 dark:bg-success-900/20 p-2 rounded-lg">
-                                        <span className="text-success-700 dark:text-success-300 font-medium">{selectedCoupon.code}</span>
-                                        <button onClick={clearCoupon} className="text-success-600 hover:text-success-800">
-                                            <X className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="relative">
-                                        <button
-                                            onClick={() => setCouponDropdownOpen(!couponDropdownOpen)}
-                                            className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
-                                            disabled={discount > 0}
-                                        >
-                                            <span className="text-gray-500">{availableCoupons.length > 0 ? 'Select promo code...' : 'No promo codes'}</span>
-                                            <ChevronDown className="h-4 w-4" />
-                                        </button>
-                                        {couponDropdownOpen && availableCoupons.length > 0 && (
-                                            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                                                {availableCoupons.map(coupon => (
+                                                {loyaltyInfo.eligibleForVisitReward && (
                                                     <button
-                                                        key={coupon.id}
-                                                        onClick={() => handleSelectCoupon(coupon)}
-                                                        className="w-full p-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 text-sm"
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setLoyaltyType('visit');
+                                                            setLoyaltyDiscount((subtotal * loyaltyInfo.visitRewardDiscount) / 100);
+                                                            showToast(`Visit reward ${loyaltyInfo.visitRewardDiscount}% applied`, 'success');
+                                                        }}
+                                                        disabled={loyaltyType === 'visit'}
+                                                        className={`px-2 py-1 text-xs rounded-lg transition-colors ${loyaltyType === 'visit' ? 'bg-green-500 text-white' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
                                                     >
-                                                        <div className="flex justify-between">
-                                                            <span className="font-medium">{coupon.code}</span>
-                                                            <span className="text-primary-600">
-                                                                {coupon.type === 'percentage' ? `${coupon.value}%` : formatCurrency(coupon.value)}
-                                                            </span>
-                                                        </div>
+                                                        {loyaltyType === 'visit' ? 'Applied' : 'Apply'}
                                                     </button>
-                                                ))}
+                                                )}
                                             </div>
+                                        )}
+
+                                        {loyaltyType !== 'none' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setLoyaltyType('none');
+                                                    setLoyaltyDiscount(0);
+                                                    setPointsToRedeem(0);
+                                                    showToast('Loyalty discount removed', 'info');
+                                                }}
+                                                className="w-full mt-2 text-xs text-gray-500 hover:text-gray-700 underline"
+                                            >
+                                                Clear loyalty discount
+                                            </button>
                                         )}
                                     </div>
                                 )}
                             </div>
                         )}
 
-                        {/* Totals */}
-                        {cart.length > 0 && (
-                            <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-                                    <span className="text-gray-900 dark:text-white">{formatCurrency(subtotal)}</span>
-                                </div>
-                                {discount > 0 && (
-                                    <div className="flex justify-between text-sm text-success-600">
-                                        <span>Discount {selectedCoupon ? `(${selectedCoupon.code})` : '(Manual)'}</span>
-                                        <span>-{formatCurrency(discount)}</span>
-                                    </div>
-                                )}
-                                {loyaltyDiscount > 0 && (
-                                    <div className="flex justify-between text-sm text-amber-600">
-                                        <span>Loyalty {loyaltyType === 'card' && '(Card)'}{loyaltyType === 'points' && '(Points)'}{loyaltyType === 'visit' && '(Visit Reward)'}</span>
-                                        <span>-{formatCurrency(loyaltyDiscount)}</span>
-                                    </div>
-                                )}
-                                {enableTax && (
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-600 dark:text-gray-400">Tax ({taxRate}%)</span>
-                                        <span className="text-gray-900 dark:text-white">{formatCurrency(tax)}</span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between text-xl font-bold pt-2 border-t border-gray-200 dark:border-gray-700">
-                                    <span className="text-gray-900 dark:text-white">Total</span>
-                                    <span className="text-primary-600">{formatCurrency(total)}</span>
-                                </div>
+
+
+                        {/* Manual Fee (Collapsible) */}
+                        {selectedCustomer && (
+                            <div className="card surface-panel overflow-hidden">
+                                <button
+                                    onClick={() => setShowManualFee(!showManualFee)}
+                                    className="w-full p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                                >
+                                <span className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                                    💵 Add Manual Fee
+                                </span>
+                                    {showManualFee ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                </button>
+                                <AnimatePresence>
+                                    {showManualFee && (
+                                        <motion.div
+                                            initial={{ height: 0 }}
+                                            animate={{ height: 'auto' }}
+                                            exit={{ height: 0 }}
+                                            className="overflow-hidden"
+                                        >
+                                            <div className="p-4 border-t border-gray-100 dark:border-gray-700 space-y-3">
+                                                <Input
+                                                    placeholder="Description"
+                                                    value={manualItem.description}
+                                                    onChange={(e) => setManualItem({ ...manualItem, description: e.target.value })}
+                                                />
+                                                <select
+                                                    value={manualItem.stylistId}
+                                                    onChange={(e) => setManualItem({ ...manualItem, stylistId: e.target.value })}
+                                                    className="w-full min-w-0 max-w-full px-4 py-2.5 rounded-xl border transition-all duration-200 appearance-none text-base bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-50 dark:disabled:bg-gray-600 disabled:cursor-not-allowed text-gray-900 dark:text-white border-gray-300 dark:border-gray-600 hover:border-gray-400"
+                                                >
+                                                    <option value="">Select Stylist...</option>
+                                                    {staff.map((s: any) => (
+                                                        <option key={s.id} value={s.id}>
+                                                            {s.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <div className="flex flex-col sm:flex-row gap-2">
+                                                    <Input
+                                                        type="number"
+                                                        placeholder="Amount"
+                                                        value={manualItem.price}
+                                                        onChange={(e) => setManualItem({ ...manualItem, price: e.target.value })}
+                                                    />
+                                                    <Button variant="primary" size="sm" onClick={addManualItem}>
+                                                        Add
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </div>
                         )}
 
-                        {/* Payment Method & Button */}
-                        {cart.length > 0 && (
-                            <div className="mt-6 space-y-4">
-                                <div>
-                                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Payment Method</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {(['Cash', 'Card'] as const).map(method => {
-                                            const selected = paymentMethod === method && !paymentBreakdown;
-                                            return (
-                                                <button
-                                                    key={method}
-                                                    type="button"
-                                                    onClick={() => { setPaymentMethod(method); setPaymentBreakdown(null); }}
-                                                    className={`p-3 rounded-xl text-sm font-medium transition-all border ${selected
-                                                        ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
-                                                        : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-500'
-                                                        }`}
-                                                >
-                                                    {method === 'Cash' ? (
-                                                        <Banknote className={`h-5 w-5 mx-auto ${selected ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`} />
-                                                    ) : (
-                                                        <CreditCard className={`h-5 w-5 mx-auto ${selected ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`} />
-                                                    )}
-                                                    <div className="text-xs mt-1.5">{method}</div>
-                                                </button>
-                                            );
-                                        })}
-                                        <button
-                                            type="button"
-                                            onClick={() => { setPaymentMethod('BankTransfer'); setPaymentBreakdown(null); }}
-                                            className={`p-3 rounded-xl text-sm font-medium transition-all border ${paymentMethod === 'BankTransfer' && !paymentBreakdown
-                                                ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
-                                                : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-500'
-                                                }`}
-                                        >
-                                            <Landmark
-                                                className={`h-5 w-5 mx-auto ${paymentMethod === 'BankTransfer' && !paymentBreakdown ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`}
-                                                aria-hidden
-                                            />
-                                            <div className="text-xs mt-1.5">Bank</div>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowSplitPayment(true)}
-                                            className={`p-3 rounded-xl text-sm font-medium transition-all border ${paymentBreakdown
-                                                ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
-                                                : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-500'
-                                                }`}
-                                        >
-                                            <div className="flex justify-center items-center gap-1 min-h-[1.25rem]">
-                                                <CreditCard className={`h-5 w-5 ${paymentBreakdown ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`} />
-                                                <Banknote className={`h-5 w-5 ${paymentBreakdown ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`} />
-                                            </div>
-                                            <div className="text-xs mt-1.5">Split</div>
-                                        </button>
+                        {/* Walk-in Services Panel */}
+                        {selectedCustomer && (
+                            <WalkInServicesPanel
+                                services={services}
+                                staff={staff}
+                                selectedStylistForService={selectedStylistForService}
+                                onStylistChange={(serviceId, stylistId) => {
+                                    const newMap = new Map(selectedStylistForService);
+                                    newMap.set(serviceId, stylistId);
+                                    setSelectedStylistForService(newMap);
+                                }}
+                                onAddService={addWalkInServiceToCart}
+                            />
+                        )}
+                    </div>
+
+                    {/* Right: Bill Summary - At bottom on tablet, right side on desktop */}
+                    <div className="xl:col-span-3">
+                        <div className="card p-4 sm:p-6 surface-panel xl:sticky xl:top-24">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <ShoppingCart className="h-5 w-5 text-primary-600" />
+                                    Bill Summary
+                                </h2>
+                                {cart.length > 0 && (
+                                    <button
+                                        onClick={clearCart}
+                                        className="text-sm text-danger-600 hover:text-danger-700 flex items-center gap-1"
+                                    >
+                                        <RotateCcw className="h-3 w-3" /> Clear
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Bill Items */}
+                            <div className="space-y-4 mb-6 max-h-[40vh] overflow-y-auto">
+                                {cart.length === 0 ? (
+                                    <div className="text-center py-12 bg-gray-50 dark:bg-gray-700/30 rounded-xl">
+                                        <ShoppingCart className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                                        <p className="text-gray-500 dark:text-gray-400">No items in bill</p>
+                                        <p className="text-xs text-gray-400 mt-1">Select a customer and add appointments</p>
                                     </div>
-                                    {paymentBreakdown && (
-                                        <div className="mt-2 p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-xs">
-                                            <div className="font-medium text-primary-800 dark:text-primary-200 mb-1">Split Payment:</div>
-                                            {paymentBreakdown.map((p, i) => (
-                                                <div key={i} className="flex justify-between text-primary-700 dark:text-primary-300">
-                                                    <span>{p.method}:</span>
-                                                    <span>{formatCurrency(p.amount)}</span>
+                                ) : (
+                                    <>
+                                        {/* Appointment Groups */}
+                                        {Object.entries(appointmentGroups).map(([aptId, group]) => (
+                                            <div key={aptId} className="bg-gradient-to-r from-primary-50 to-transparent dark:from-primary-900/20 rounded-xl p-4 border border-primary-200 dark:border-primary-800">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <Calendar className="h-4 w-4 text-primary-600" />
+                                                        <span className="text-sm font-medium text-primary-800 dark:text-primary-200">
+                                                        Appointment at {group.appointment.start_time}
+                                                    </span>
+                                                        <span className="text-xs bg-primary-200 dark:bg-primary-800 px-2 py-0.5 rounded text-primary-700 dark:text-primary-300">
+                                                        {group.items[0]?.stylistName}
+                                                    </span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => removeAppointmentFromCart(aptId)}
+                                                        className="text-primary-600 hover:text-danger-600 transition-colors"
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </button>
                                                 </div>
-                                            ))}
+                                                <div className="space-y-2">
+                                                    {group.items.map((item: any) => (
+                                                        <div key={item.index} className="flex justify-between items-center text-sm">
+                                                            <span className="text-gray-700 dark:text-gray-300">{item.name}</span>
+                                                            <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(item.price)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="mt-2 pt-2 border-t border-primary-200 dark:border-primary-700 flex justify-between font-medium">
+                                                    <span className="text-primary-800 dark:text-primary-200">Subtotal</span>
+                                                    <span className="text-primary-900 dark:text-primary-100">
+                                                    {formatCurrency(group.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0))}
+                                                </span>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {/* Extra Items */}
+                                        {extraItems.length > 0 && (
+                                            <div className="bg-gray-50 dark:bg-gray-700/30 rounded-xl p-4">
+                                                <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">
+                                                    Extra Services
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {extraItems.map((item: any) => (
+                                                        <div key={item.index} className="flex justify-between items-center">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="flex-1">
+                                                                    <span className="text-gray-900 dark:text-white">{item.name}</span>
+                                                                    {(item.type === 'walk-in-service' || item.type === 'manual') && item.stylistName && (
+                                                                        <div className="flex items-center gap-1 mt-0.5">
+                                                                            <User className="h-3 w-3 text-primary-500" />
+                                                                            <span className="text-xs text-primary-600 dark:text-primary-400">
+                                                                            {item.stylistName}
+                                                                        </span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex items-center gap-1 text-xs">
+                                                                    <button
+                                                                        onClick={() => updateItemQuantity(item.index, -1)}
+                                                                        className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-600 hover:bg-gray-300"
+                                                                    >-</button>
+                                                                    <span className="w-6 text-center">{item.quantity}</span>
+                                                                    <button
+                                                                        onClick={() => updateItemQuantity(item.index, 1)}
+                                                                        className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-600 hover:bg-gray-300"
+                                                                    >+</button>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-medium">{formatCurrency(item.price * item.quantity)}</span>
+                                                                <button onClick={() => removeFromCart(item.index)} className="text-gray-400 hover:text-danger-500">
+                                                                    <X className="h-4 w-4" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Discount Section */}
+                            {cart.length > 0 && (
+                                <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700/30 rounded-xl space-y-3">
+                                    <label className="text-xs font-medium text-gray-500 mb-2 block">Discount</label>
+
+                                    {/* Manual Discount Input */}
+                                    <div>
+                                        <label className="text-xs text-gray-500 mb-1 block">Manual Discount (%)</label>
+                                        <Input
+                                            type="number"
+                                            value={selectedCoupon ? '' : discountInput}
+                                            onChange={(e) => {
+                                                setDiscountInput(e.target.value);
+                                            }}
+                                            onBlur={(e) => {
+                                                const percentage = parseFloat(e.target.value) || 0;
+                                                const clampedPercentage = Math.min(Math.max(percentage, 0), 100);
+                                                const discountAmount = (subtotal * clampedPercentage) / 100;
+                                                setDiscount(discountAmount);
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    const percentage = parseFloat((e.target as HTMLInputElement).value) || 0;
+                                                    const clampedPercentage = Math.min(Math.max(percentage, 0), 100);
+                                                    const discountAmount = (subtotal * clampedPercentage) / 100;
+                                                    setDiscount(discountAmount);
+                                                }
+                                            }}
+                                            placeholder="0"
+                                            min="0"
+                                            max="100"
+                                            step="any"
+                                            disabled={!!selectedCoupon}
+                                            className="text-sm"
+                                        />
+                                        {discount > 0 && !selectedCoupon && (
+                                            <p className="text-xs text-success-600 mt-1">
+                                                Discount: {formatCurrency(discount)}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Divider */}
+                                    <div className="relative">
+                                        <div className="absolute inset-0 flex items-center">
+                                            <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+                                        </div>
+                                        <div className="relative flex justify-center text-xs">
+                                            <span className="bg-gray-50 dark:bg-gray-700/30 px-2 text-gray-500">or use promo code</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Promo Code Selector */}
+                                    {selectedCoupon ? (
+                                        <div className="flex items-center justify-between bg-success-50 dark:bg-success-900/20 p-2 rounded-lg">
+                                            <span className="text-success-700 dark:text-success-300 font-medium">{selectedCoupon.code}</span>
+                                            <button onClick={clearCoupon} className="text-success-600 hover:text-success-800">
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="relative">
+                                            <button
+                                                onClick={() => setCouponDropdownOpen(!couponDropdownOpen)}
+                                                className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm"
+                                                disabled={discount > 0}
+                                            >
+                                                <span className="text-gray-500">{availableCoupons.length > 0 ? 'Select promo code...' : 'No promo codes'}</span>
+                                                <ChevronDown className="h-4 w-4" />
+                                            </button>
+                                            {couponDropdownOpen && availableCoupons.length > 0 && (
+                                                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                                                    {availableCoupons.map(coupon => (
+                                                        <button
+                                                            key={coupon.id}
+                                                            onClick={() => handleSelectCoupon(coupon)}
+                                                            className="w-full p-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 text-sm"
+                                                        >
+                                                            <div className="flex justify-between">
+                                                                <span className="font-medium">{coupon.code}</span>
+                                                                <span className="text-primary-600">
+                                                                {coupon.type === 'percentage' ? `${coupon.value}%` : formatCurrency(coupon.value)}
+                                                            </span>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
+                            )}
 
-                                <Button
-                                    variant="primary"
-                                    size="lg"
-                                    className="w-full py-4 text-lg"
-                                    onClick={handlePayment}
-                                    isLoading={processingPayment}
-                                    disabled={!selectedCustomer || cart.length === 0}
-                                >
-                                    Complete Payment • {formatCurrency(total)}
-                                </Button>
-                            </div>
-                        )}
+                            {/* Totals */}
+                            {cart.length > 0 && (
+                                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
+                                        <span className="text-gray-900 dark:text-white">{formatCurrency(subtotal)}</span>
+                                    </div>
+                                    {discount > 0 && (
+                                        <div className="flex justify-between text-sm text-success-600">
+                                            <span>Discount {selectedCoupon ? `(${selectedCoupon.code})` : '(Manual)'}</span>
+                                            <span>-{formatCurrency(discount)}</span>
+                                        </div>
+                                    )}
+                                    {loyaltyDiscount > 0 && (
+                                        <div className="flex justify-between text-sm text-amber-600">
+                                            <span>Loyalty {loyaltyType === 'card' && '(Card)'}{loyaltyType === 'points' && '(Points)'}{loyaltyType === 'visit' && '(Visit Reward)'}</span>
+                                            <span>-{formatCurrency(loyaltyDiscount)}</span>
+                                        </div>
+                                    )}
+                                    {enableTax && (
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-600 dark:text-gray-400">Tax ({taxRate}%)</span>
+                                            <span className="text-gray-900 dark:text-white">{formatCurrency(tax)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between text-xl font-bold pt-2 border-t border-gray-200 dark:border-gray-700">
+                                        <span className="text-gray-900 dark:text-white">Total</span>
+                                        <span className="text-primary-600">{formatCurrency(total)}</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Payment Method & Button */}
+                            {cart.length > 0 && (
+                                <div className="mt-6 space-y-4">
+                                    <div>
+                                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 block">Payment Method</label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {(['Cash', 'Card'] as const).map(method => {
+                                                const selected = paymentMethod === method && !paymentBreakdown;
+                                                return (
+                                                    <button
+                                                        key={method}
+                                                        type="button"
+                                                        onClick={() => { setPaymentMethod(method); setPaymentBreakdown(null); }}
+                                                        className={`p-3 rounded-xl text-sm font-medium transition-all border ${selected
+                                                            ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
+                                                            : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-500'
+                                                        }`}
+                                                    >
+                                                        {method === 'Cash' ? (
+                                                            <Banknote className={`h-5 w-5 mx-auto ${selected ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`} />
+                                                        ) : (
+                                                            <CreditCard className={`h-5 w-5 mx-auto ${selected ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`} />
+                                                        )}
+                                                        <div className="text-xs mt-1.5">{method}</div>
+                                                    </button>
+                                                );
+                                            })}
+                                            <button
+                                                type="button"
+                                                onClick={() => { setPaymentMethod('BankTransfer'); setPaymentBreakdown(null); }}
+                                                className={`p-3 rounded-xl text-sm font-medium transition-all border ${paymentMethod === 'BankTransfer' && !paymentBreakdown
+                                                    ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
+                                                    : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-500'
+                                                }`}
+                                            >
+                                                <Landmark
+                                                    className={`h-5 w-5 mx-auto ${paymentMethod === 'BankTransfer' && !paymentBreakdown ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`}
+                                                    aria-hidden
+                                                />
+                                                <div className="text-xs mt-1.5">Bank</div>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowSplitPayment(true)}
+                                                className={`p-3 rounded-xl text-sm font-medium transition-all border ${paymentBreakdown
+                                                    ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
+                                                    : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-500'
+                                                }`}
+                                            >
+                                                <div className="flex justify-center items-center gap-1 min-h-[1.25rem]">
+                                                    <CreditCard className={`h-5 w-5 ${paymentBreakdown ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`} />
+                                                    <Banknote className={`h-5 w-5 ${paymentBreakdown ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`} />
+                                                </div>
+                                                <div className="text-xs mt-1.5">Split</div>
+                                            </button>
+                                        </div>
+                                        {paymentBreakdown && (
+                                            <div className="mt-2 p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-xs">
+                                                <div className="font-medium text-primary-800 dark:text-primary-200 mb-1">Split Payment:</div>
+                                                {paymentBreakdown.map((p, i) => (
+                                                    <div key={i} className="flex justify-between text-primary-700 dark:text-primary-300">
+                                                        <span>{p.method}:</span>
+                                                        <span>{formatCurrency(p.amount)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <Button
+                                        variant="primary"
+                                        size="lg"
+                                        className="w-full py-4 text-lg"
+                                        onClick={handlePayment}
+                                        isLoading={processingPayment}
+                                        disabled={!selectedCustomer || cart.length === 0}
+                                    >
+                                        Complete Payment • {formatCurrency(total)}
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Receipt Modal */}
-            {
-                lastInvoice && (
-                    <ReceiptModal
-                        isOpen={showReceipt}
-                        onClose={() => setShowReceipt(false)}
-                        invoice={lastInvoice}
-                    />
-                )
-            }
+                {/* Receipt Modal */}
+                {
+                    lastInvoice && (
+                        <ReceiptModal
+                            isOpen={showReceipt}
+                            onClose={() => setShowReceipt(false)}
+                            invoice={lastInvoice}
+                        />
+                    )
+                }
 
-            {/* Split Payment Modal */}
-            {
-                showSplitPayment && (
-                    <SplitPaymentModal
-                        total={total}
-                        onConfirm={(breakdown, primaryMethod) => {
-                            setPaymentBreakdown(breakdown);
-                            setPaymentMethod(primaryMethod);
-                            setShowSplitPayment(false);
-                            showToast('Split payment configured', 'success');
-                        }}
-                        onCancel={() => setShowSplitPayment(false)}
-                    />
-                )
-            }
+                {/* Split Payment Modal */}
+                {
+                    showSplitPayment && (
+                        <SplitPaymentModal
+                            total={total}
+                            onConfirm={(breakdown, primaryMethod) => {
+                                setPaymentBreakdown(breakdown);
+                                setPaymentMethod(primaryMethod);
+                                setShowSplitPayment(false);
+                                showToast('Split payment configured', 'success');
+                            }}
+                            onCancel={() => setShowSplitPayment(false)}
+                        />
+                    )
+                }
 
-            {/* Quick Customer Creation Form */}
-            <QuickCustomerForm
-                isOpen={showCustomerForm}
-                onClose={() => setShowCustomerForm(false)}
-                onSubmit={handleQuickCustomerCreate}
-                initialPhone={pendingPhone}
+                {/* Quick Customer Creation Form */}
+                <QuickCustomerForm
+                    isOpen={showCustomerForm}
+                    onClose={() => setShowCustomerForm(false)}
+                    onSubmit={handleQuickCustomerCreate}
+                    initialPhone={pendingPhone}
+                />
+            </div >
+
+            <ConfirmationDialog
+                isOpen={showClearConfirm}
+                onClose={() => setShowClearConfirm(false)}
+                onConfirm={doClearCart}
+                title="Clear Bill?"
+                message="Are you sure you want to clear the entire bill? All items will be removed."
+                confirmText="Clear Bill"
+                cancelText="Cancel"
+                variant="danger"
             />
-        </div >
-
-        <ConfirmationDialog
-            isOpen={showClearConfirm}
-            onClose={() => setShowClearConfirm(false)}
-            onConfirm={doClearCart}
-            title="Clear Bill?"
-            message="Are you sure you want to clear the entire bill? All items will be removed."
-            confirmText="Clear Bill"
-            cancelText="Cancel"
-            variant="danger"
-        />
         </>
     );
 }
