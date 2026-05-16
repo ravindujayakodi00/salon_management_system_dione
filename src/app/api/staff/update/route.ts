@@ -27,10 +27,23 @@ export async function PUT(request: NextRequest) {
             );
         }
 
+        // Only pass columns that exist in the actual staff table
+        const staffUpdates: any = {};
+        const staffColumns = ['name', 'phone', 'salary', 'branch_id', 'is_active'];
+        for (const col of staffColumns) {
+            if (updates[col] !== undefined) staffUpdates[col] = updates[col];
+        }
+
+        // When system_role changes, sync both role and system_role columns
+        if (updates.system_role) {
+            staffUpdates.system_role = updates.system_role;
+            staffUpdates.role = updates.system_role; // keep legacy column in sync
+        }
+
         // Update staff entry using admin client (bypasses RLS)
         const { data, error: staffError } = await supabaseAdmin
             .from('staff')
-            .update(updates)
+            .update(staffUpdates)
             .eq('id', id)
             .eq('organization_id', organizationId)
             .select();
@@ -50,13 +63,16 @@ export async function PUT(request: NextRequest) {
             );
         }
 
-        // If name or role changed, update profile too
-        if (updates.name || updates.role) {
+        // If name or system_role changed, update profile too
+        if (staffUpdates.name || updates.system_role) {
             const staff = data[0];
             if (staff?.profile_id) {
                 const profileUpdates: any = {};
-                if (updates.name) profileUpdates.name = updates.name;
-                if (updates.role) profileUpdates.role = updates.role;
+                if (staffUpdates.name) profileUpdates.name = staffUpdates.name;
+                if (updates.system_role) {
+                    profileUpdates.system_role = updates.system_role;
+                    profileUpdates.role = updates.system_role; // keep legacy column in sync
+                }
 
                 const { error: profileError } = await supabaseAdmin
                     .from('profiles')
@@ -110,7 +126,7 @@ export async function PATCH(request: NextRequest) {
         // Get caller's organization from their staff/profile row
         const { data: callerProfile } = await supabaseAdmin
             .from('staff')
-            .select('organization_id, role')
+            .select('organization_id, system_role')
             .eq('profile_id', callerUser.id)
             .maybeSingle();
 
@@ -119,7 +135,7 @@ export async function PATCH(request: NextRequest) {
         }
 
         // Only Owners and Managers can change passwords
-        if (!['Owner', 'Manager'].includes(callerProfile.role)) {
+        if (!['Owner', 'Manager'].includes(callerProfile.system_role)) {
             return NextResponse.json({ success: false, error: 'Forbidden: insufficient role' }, { status: 403 });
         }
 

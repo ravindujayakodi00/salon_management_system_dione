@@ -55,46 +55,6 @@ export const settingsService = {
     },
 
     /**
-     * Get commission settings for the organization
-     */
-    async getCommissionSettings(organizationId: string) {
-        try {
-            const { data, error } = await supabase
-                .from('commission_settings')
-                .select('*')
-                .eq('organization_id', organizationId)
-                .order('role');
-
-            if (error) throw error;
-            return data;
-        } catch (error) {
-            console.error('Error fetching commission settings:', error);
-            throw error;
-        }
-    },
-
-    /**
-     * Update commission settings (Owner only)
-     */
-    async updateCommissionSettings(organizationId: string, role: string, percentage: number) {
-        try {
-            const { data, error } = await supabase
-                .from('commission_settings')
-                .update({ commission_percentage: percentage })
-                .eq('organization_id', organizationId)
-                .eq('role', role)
-                .select()
-                .single();
-
-            if (error) throw error;
-            return data;
-        } catch (error) {
-            console.error('Error updating commission settings:', error);
-            throw error;
-        }
-    },
-
-    /**
      * Get salary settings for staff
      */
     async getSalarySettings(staffId: string) {
@@ -190,7 +150,7 @@ export const settingsService = {
             const organizationId = await getCurrentOrganizationId();
             const { data, error } = await supabase
                 .from('staff')
-                .select('id, name, email, role, is_active')
+                .select('id, name, email, system_role, is_active')
                 .eq('organization_id', organizationId)
                 .eq('is_active', true)
                 .order('name');

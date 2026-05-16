@@ -18,6 +18,7 @@ function generatePassword(): string {
 }
 
 export async function createStaffAction(staffData: {
+    salary: number;
     name: string;
     email: string;
     phone: string;
@@ -40,13 +41,13 @@ export async function createStaffAction(staffData: {
 
         const { data: callerProfile, error: callerProfileError } = await supabaseAuthed
             .from('profiles')
-            .select('id, role, organization_id')
+            .select('id, system_role, organization_id')
             .eq('id', user.id)
             .single();
         if (callerProfileError || !callerProfile) {
             return { success: false, message: 'Unauthorized' };
         }
-        if (callerProfile.role !== 'Owner') {
+        if (callerProfile.system_role !== 'Owner') {
             return { success: false, message: 'Only the Owner can create staff members.' };
         }
 
@@ -94,7 +95,8 @@ export async function createStaffAction(staffData: {
                 id: authData.user.id,
                 email: staffData.email,
                 name: staffData.name,
-                role: staffData.role,
+                role: staffData.role,       // keep for Dione legacy reads
+                system_role: staffData.role, // behavioral role
                 branch_id: staffData.branch_id,
                 organization_id: branch.organization_id,
                 is_active: true,
@@ -115,11 +117,13 @@ export async function createStaffAction(staffData: {
                 email: staffData.email,
                 phone: staffData.phone,
                 role: staffData.role,
+                system_role: staffData.role,
                 branch_id: staffData.branch_id,
                 organization_id: branch.organization_id,
                 specializations: staffData.specializations || [],
                 working_days: staffData.working_days || [],
                 working_hours: staffData.working_hours,
+                salary: staffData.salary,
                 is_active: true,
             });
 
@@ -212,13 +216,13 @@ export async function deleteStaffAction(id: string) {
 
         const { data: callerProfile, error: profileError } = await supabaseAuthed
             .from('profiles')
-            .select('id, role, organization_id')
+            .select('id, system_role, organization_id')
             .eq('id', user.id)
             .single();
         if (profileError || !callerProfile) {
             return { success: false, message: 'Unauthorized' };
         }
-        if (callerProfile.role !== 'Owner') {
+        if (callerProfile.system_role !== 'Owner') {
             return { success: false, message: 'Only the Owner can delete staff members.' };
         }
 

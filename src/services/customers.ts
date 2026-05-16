@@ -211,6 +211,17 @@ export const customersService = {
      */
     async deleteCustomer(id: string) {
         const organizationId = await getCurrentOrganizationId();
+
+        // Check for existing appointments before deleting
+        const { count: apptCount } = await supabase
+            .from('appointments')
+            .select('id', { count: 'exact', head: true })
+            .eq('customer_id', id)
+            .eq('organization_id', organizationId);
+        if (apptCount && apptCount > 0) {
+            throw new Error(`Cannot delete this customer because they have ${apptCount} appointment(s) on record.`);
+        }
+
         // Delete related campaign sends first (foreign key constraint)
         const { error: campaignSendsError } = await supabase
             .from('campaign_sends')

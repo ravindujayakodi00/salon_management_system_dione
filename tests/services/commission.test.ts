@@ -1,117 +1,57 @@
 /**
  * Commission Calculation Tests
- * Tests for walk-in and appointment-based commission tracking
+ * Pure math tests for commission rate logic — no DB required.
  */
 
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 describe('Commission Calculations', () => {
-    let testStylist: any;
-    let testCustomer: any;
-
-    beforeEach(async () => {
-        // Create test data
-        testStylist = {
-            id: `test-stylist-${Date.now()}`,
-            name: 'Test Stylist',
-            role: 'Stylist',
-            commission: 45, // 45% commission
-            is_active: true,
-        };
-
-        testCustomer = {
-            id: `test-customer-${Date.now()}`,
-            name: 'Test Customer',
-            phone: '0771234567',
-            total_visits: 0,
-            total_spent: 0,
-        };
-    });
-
-    afterEach(async () => {
-        // Cleanup test data
-        await supabase.from('staff_earnings').delete().eq('staff_id', testStylist.id);
-        await supabase.from('staff').delete().eq('id', testStylist.id);
-        await supabase.from('customers').delete().eq('id', testCustomer.id);
-    });
-
-    test('Walk-in service commission calculated correctly at 40%', () => {
+    test('Walk-in service commission calculated correctly at 40% default rate', () => {
         const serviceRevenue = 1000;
-        const expectedCommission = 400; // 40% default
         const commissionRate = 40;
-
-        // Test commission calculation logic
         const calculatedCommission = (serviceRevenue * commissionRate) / 100;
 
-        expect(calculatedCommission).toBe(expectedCommission);
-        expect(calculatedCommission / serviceRevenue).toBe(0.4); // 40%
+        expect(calculatedCommission).toBe(400);
+        expect(calculatedCommission / serviceRevenue).toBe(0.4);
     });
 
-    test('Custom commission rate applied correctly', async () => {
+    test('Custom commission rate (45%) applied correctly', () => {
         const serviceRevenue = 2000;
         const customRate = 45;
-        const expectedCommission = 900; // 45% of 2000
-
-        await supabase.from('staff').insert(testStylist);
-
-        // Verify custom rate calculation
         const calculatedCommission = (serviceRevenue * customRate) / 100;
-        expect(calculatedCommission).toBe(expectedCommission);
+
+        expect(calculatedCommission).toBe(900);
     });
 
-    test('Multiple services for same stylist aggregated correctly', async () => {
-        const service1Revenue = 1000;
-        const service2Revenue = 1500;
-        const totalRevenue = 2500;
-        const expectedCommission = 1125; // 45% of 2500
-
-        await supabase.from('staff').insert(testStylist);
-
+    test('Multiple services for same stylist aggregated before commission', () => {
+        const commissionRate = 45;
         const items = [
-            {
-                type: 'walk-in-service',
-                stylistId: testStylist.id,
-                price: service1Revenue,
-                quantity: 1,
-            },
-            {
-                type: 'walk-in-service',
-                stylistId: testStylist.id,
-                price: service2Revenue,
-                quantity: 1,
-            },
+            { price: 1000 },
+            { price: 1500 },
         ];
 
-        // Aggregate revenue
-        const aggregatedRevenue = items.reduce((sum, item) => sum + item.price, 0);
-        const calculatedCommission = (aggregatedRevenue * testStylist.commission) / 100;
+        const totalRevenue = items.reduce((sum, item) => sum + item.price, 0);
+        const calculatedCommission = (totalRevenue * commissionRate) / 100;
 
-        expect(aggregatedRevenue).toBe(totalRevenue);
-        expect(calculatedCommission).toBe(expectedCommission);
+        expect(totalRevenue).toBe(2500);
+        expect(calculatedCommission).toBe(1125);
     });
 
-    test('Different stylists receive separate commissions', async () => {
-        const stylist2 = {
-            ...testStylist,
-            id: `test-stylist-2-${Date.now()}`,
-            commission: 40,
-        };
+    test('Different stylists receive separate independently calculated commissions', () => {
+        const stylist1 = { revenue: 1000, commissionRate: 45 };
+        const stylist2 = { revenue: 1500, commissionRate: 40 };
 
-        await supabase.from('staff').insert([testStylist, stylist2]);
+        const commission1 = (stylist1.revenue * stylist1.commissionRate) / 100;
+        const commission2 = (stylist2.revenue * stylist2.commissionRate) / 100;
 
-        const stylist1Revenue = 1000;
-        const stylist2Revenue = 1500;
+        expect(commission1).toBe(450);
+        expect(commission2).toBe(600);
+    });
 
-        // Verify separate calculations
-        const stylist1Commission = (stylist1Revenue * 45) / 100; // 450
-        const stylist2Commission = (stylist2Revenue * 40) / 100; // 600
+    test('Zero revenue results in zero commission', () => {
+        expect((0 * 40) / 100).toBe(0);
+    });
 
-        expect(stylist1Commission).toBe(450);
-        expect(stylist2Commission).toBe(600);
+    test('100% commission rate returns full service revenue', () => {
+        const revenue = 1500;
+        expect((revenue * 100) / 100).toBe(revenue);
     });
 });

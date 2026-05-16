@@ -28,14 +28,14 @@ export default function ReportsPage() {
     useEffect(() => {
         loadData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user?.organizationId]);
+    }, [user?.organizationId, effectiveBranchId]);
 
     const loadData = async () => {
         try {
             setLoading(true);
             const [summaryData, dailyData] = await Promise.all([
-                analyticsService.getSummary(),
-                analyticsService.getDailyStats(7)
+                analyticsService.getSummary(effectiveBranchId),
+                analyticsService.getDailyStats(7, effectiveBranchId)
             ]);
             setSummary(summaryData);
             setDailyStats(dailyData);
@@ -317,7 +317,7 @@ function SystemReports() {
                 generateSalesReportPDF(data);
             } else if (reportId === 'customer_growth') {
                 const { generateCustomerGrowthReportPDF } = await import('@/lib/pdf-generator');
-                const data = await reportsService.getCustomerGrowthReportData();
+                const data = await reportsService.getCustomerGrowthReportData(effectiveBranchId);
                 generateCustomerGrowthReportPDF(data);
             } else if (reportId === 'staff_performance') {
                 const { generateStaffPerformanceReportPDF } = await import('@/lib/pdf-generator');
@@ -325,7 +325,7 @@ function SystemReports() {
                 generateStaffPerformanceReportPDF(data);
             } else if (reportId === 'inventory_status') {
                 const { generateInventoryReportPDF } = await import('@/lib/pdf-generator');
-                const data = await reportsService.getInventoryReportData();
+                const data = await reportsService.getInventoryReportData(effectiveBranchId);
                 generateInventoryReportPDF(data);
             }
         } catch (error: any) {

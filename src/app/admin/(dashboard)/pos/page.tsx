@@ -218,10 +218,10 @@ export default function POSPage() {
         try {
             let q = supabase
                 .from('staff')
-                .select('id, name, role')
+                .select('id, name, system_role')
                 .eq('organization_id', user.organizationId)
                 .eq('is_active', true)
-                .eq('role', 'Stylist')
+                .eq('system_role', 'Stylist')
                 .order('name');
             if (effectiveBranchId) q = q.eq('branch_id', effectiveBranchId);
             const { data, error } = await q;

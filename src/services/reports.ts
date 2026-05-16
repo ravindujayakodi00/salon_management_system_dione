@@ -240,14 +240,16 @@ export const reportsService = {
     /**
      * Get customer growth report data for PDF
      */
-    async getCustomerGrowthReportData() {
+    async getCustomerGrowthReportData(branchId?: string) {
         const organizationId = await getCurrentOrganizationId();
-        const { data: customers, error } = await supabase
+        let q = supabase
             .from('customers')
             .select('*')
             .eq('organization_id', organizationId)
             .order('total_spent', { ascending: false })
             .limit(50000);
+        if (branchId) q = q.eq('branch_id', branchId);
+        const { data: customers, error } = await q;
 
         if (error) throw error;
 
@@ -350,7 +352,7 @@ export const reportsService = {
 
                 return {
                     name: staffMember.name,
-                    role: staffMember.role,
+                    role: staffMember.system_role,
                     appointmentsCompleted: appointments?.length || 0,
                     totalRevenue,
                     commission: totalCommission,
@@ -368,15 +370,17 @@ export const reportsService = {
     /**
      * Get inventory status report data for PDF
      */
-    async getInventoryReportData() {
+    async getInventoryReportData(branchId?: string) {
         const organizationId = await getCurrentOrganizationId();
-        const { data: products, error } = await supabase
+        let q = supabase
             .from('inventory')
             .select('*')
             .eq('organization_id', organizationId)
             .eq('is_active', true)
             .order('name')
             .limit(2000);
+        if (branchId) q = q.eq('branch_id', branchId);
+        const { data: products, error } = await q;
 
         if (error) throw error;
 

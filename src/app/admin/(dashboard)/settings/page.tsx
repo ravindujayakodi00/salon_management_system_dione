@@ -18,14 +18,14 @@ import { supabase } from '@/lib/supabase';
 import { schedulingService } from '@/services/scheduling';
 import { availabilityService, AvailabilityRecord } from '@/services/availability';
 import { staffService } from '@/services/staff';
-import { UserRole } from '@/lib/types';
+import { SystemRole } from '@/lib/types';
 
 interface ShowMessage {
     (type: 'success' | 'error', text: string): void;
 }
 
 interface PasswordChangeSectionProps {
-    hasRole: (roles: UserRole[]) => boolean;
+    hasRole: (roles: SystemRole[]) => boolean;
     showMessage: ShowMessage;
 }
 
@@ -298,7 +298,7 @@ function StaffPasswordSection({ showMessage }: StaffPasswordSectionProps) {
         try {
             const { data } = await supabase
                 .from('staff')
-                .select('id, name, email, role')
+                .select('id, name, email, system_role')
                 .eq('organization_id', user.organizationId)
                 .eq('is_active', true)
                 .order('name');
@@ -381,7 +381,7 @@ function StaffPasswordSection({ showMessage }: StaffPasswordSectionProps) {
                         <option value="">Choose a staff member...</option>
                         {staff.map((s) => (
                             <option key={s.id} value={s.id}>
-                                {s.name} - {s.role} ({s.email})
+                                {s.name} - {s.system_role} ({s.email})
                             </option>
                         ))}
                     </select>

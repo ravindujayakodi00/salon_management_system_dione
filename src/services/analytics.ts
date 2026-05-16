@@ -21,14 +21,16 @@ export const analyticsService = {
     /**
      * Get overall campaign analytics summary
      */
-    async getSummary(): Promise<AnalyticsSummary> {
+    async getSummary(branchId?: string): Promise<AnalyticsSummary> {
         try {
             const organizationId = await getCurrentOrganizationId();
-            const { data: campaigns, error } = await supabase
+            let query = supabase
                 .from('campaigns')
                 .select('sent_count, delivered_count, failed_count, actual_cost')
                 .eq('organization_id', organizationId)
                 .eq('status', 'completed');
+            if (branchId) query = query.eq('branch_id', branchId);
+            const { data: campaigns, error } = await query;
 
             if (error) throw error;
 
@@ -59,18 +61,20 @@ export const analyticsService = {
     /**
      * Get daily sending stats for charts
      */
-    async getDailyStats(days: number = 7): Promise<DailyStats[]> {
+    async getDailyStats(days: number = 7, branchId?: string): Promise<DailyStats[]> {
         try {
             const startDate = new Date();
             startDate.setDate(startDate.getDate() - days);
             const organizationId = await getCurrentOrganizationId();
 
-            const { data: sends, error } = await supabase
+            let query = supabase
                 .from('campaign_sends')
                 .select('sent_at, status')
                 .eq('organization_id', organizationId)
                 .gte('sent_at', startDate.toISOString())
                 .order('sent_at', { ascending: true });
+            if (branchId) query = query.eq('branch_id', branchId);
+            const { data: sends, error } = await query;
 
             if (error) throw error;
 
