@@ -94,7 +94,10 @@ export default function StaffPage() {
                 name: s.name,
                 email: s.email,
                 phone: s.phone || '',
-                role: rolesData.find((r: OrgRole) => r.systemRole === s.system_role)?.displayName ?? s.system_role ?? s.role,
+                role: rolesData.find((r: OrgRole) => r.id === s.org_role_id)?.displayName
+                    ?? rolesData.find((r: OrgRole) => r.systemRole === s.system_role)?.displayName
+                    ?? s.system_role,
+                orgRoleId: s.org_role_id,
                 systemRole: s.system_role,
                 branchId: s.branch_id,
                 specializations: s.specializations || [],
@@ -120,6 +123,11 @@ export default function StaffPage() {
         return formData.role as 'Manager' | 'Receptionist' | 'Stylist';
     };
 
+    // Returns the org_role_id for the currently selected role in the form
+    const getFormOrgRoleId = (): string | undefined => {
+        return orgRoles.find(r => r.displayName === formData.role)?.id;
+    };
+
     const showMessage = (type: 'success' | 'error', text: string) => {
         setMessage({ type, text });
         setTimeout(() => setMessage(null), 5000);
@@ -132,6 +140,7 @@ export default function StaffPage() {
             email: formData.email,
             phone: formData.phone,
             system_role: getFormSystemRole(),
+            org_role_id: getFormOrgRoleId(),
             branch_id: formData.branch_id || (branches.length > 0 ? branches[0].id : ''),
             specializations: formData.specializations,
             working_days: formData.working_days,
@@ -161,6 +170,7 @@ export default function StaffPage() {
             name: formData.name,
             phone: formData.phone,
             system_role: getFormSystemRole(),
+            org_role_id: getFormOrgRoleId(),
             branch_id: formData.branch_id,
             specializations: formData.specializations,
             working_days: formData.working_days,

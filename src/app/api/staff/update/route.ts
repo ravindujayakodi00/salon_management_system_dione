@@ -29,15 +29,13 @@ export async function PUT(request: NextRequest) {
 
         // Only pass columns that exist in the actual staff table
         const staffUpdates: any = {};
-        const staffColumns = ['name', 'phone', 'salary', 'branch_id', 'is_active'];
+        const staffColumns = ['name', 'phone', 'salary', 'branch_id', 'is_active', 'org_role_id'];
         for (const col of staffColumns) {
             if (updates[col] !== undefined) staffUpdates[col] = updates[col];
         }
 
-        // When system_role changes, sync both role and system_role columns
         if (updates.system_role) {
             staffUpdates.system_role = updates.system_role;
-            staffUpdates.role = updates.system_role; // keep legacy column in sync
         }
 
         // Update staff entry using admin client (bypasses RLS)
@@ -63,16 +61,14 @@ export async function PUT(request: NextRequest) {
             );
         }
 
-        // If name or system_role changed, update profile too
-        if (staffUpdates.name || updates.system_role) {
+        // If name, system_role, or org_role_id changed, update profile too
+        if (staffUpdates.name || updates.system_role || updates.org_role_id !== undefined) {
             const staff = data[0];
             if (staff?.profile_id) {
                 const profileUpdates: any = {};
                 if (staffUpdates.name) profileUpdates.name = staffUpdates.name;
-                if (updates.system_role) {
-                    profileUpdates.system_role = updates.system_role;
-                    profileUpdates.role = updates.system_role; // keep legacy column in sync
-                }
+                if (updates.system_role) profileUpdates.system_role = updates.system_role;
+                if (updates.org_role_id !== undefined) profileUpdates.org_role_id = updates.org_role_id;
 
                 const { error: profileError } = await supabaseAdmin
                     .from('profiles')

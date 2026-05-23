@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminClient } from '@/lib/supabase';
-import { getSupabaseServerClient } from '@/lib/supabase-server';
-import { sendEmailFromServer } from '@/lib/email-server';
+import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { randomBytes } from 'crypto';
+import { sendEmailFromServer } from '@/lib/email-server';
+
+const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+);
 
 function generatePassword(): string {
     const length = 16;
@@ -18,7 +25,19 @@ function generatePassword(): string {
 export async function POST(request: NextRequest) {
     try {
         // Authenticate caller via cookies
-        const supabaseAuthed = await getSupabaseServerClient();
+        const cookieStore = await cookies();
+        const supabaseAuthed = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    get: (name: string) => cookieStore.get(name)?.value ?? null,
+                    set: (name: string, value: string, options: any) => cookieStore.set({ name, value, ...options }),
+                    remove: (name: string) => cookieStore.delete(name),
+                },
+            }
+        );
+
         const { data: { user }, error: authError } = await supabaseAuthed.auth.getUser();
         if (authError || !user) {
             return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -38,7 +57,7 @@ export async function POST(request: NextRequest) {
 
         const body = await request.json();
         const {
-            name, email, phone, system_role, branch_id,
+            name, email, phone, system_role, org_role_id, branch_id,
             specializations, working_days, working_hours,
             salary, commission,
         } = body;
@@ -47,10 +66,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ success: false, error: 'Missing required fields.' }, { status: 400 });
         }
 
-        const adminClient = getAdminClient();
-
         // Validate branch belongs to caller's org
-        const { data: branch, error: branchError } = await adminClient
+        const { data: branch, error: branchError } = await supabaseAdmin
             .from('branches')
             .select('id, organization_id')
             .eq('id', branch_id)
@@ -65,7 +82,7 @@ export async function POST(request: NextRequest) {
         const tempPassword = generatePassword();
 
         // 1. Create auth user
-        const { data: authData, error: authCreateError } = await adminClient.auth.admin.createUser({
+        const { data: authData, error: authCreateError } = await supabaseAdmin.auth.admin.createUser({
             email,
             password: tempPassword,
             email_confirm: true,
@@ -78,32 +95,33 @@ export async function POST(request: NextRequest) {
         }
         if (!authData.user) throw new Error('Failed to create auth user');
 
-        // 2. Create profile — write both role and system_role
-        const { error: insertProfileError } = await adminClient
+        // 2. Create profile
+        const profileInsert: Record<string, unknown> = {
+            id: authData.user.id,
+            email,
+            name,
+            system_role,
+            branch_id,
+            organization_id: branch.organization_id,
+            is_active: true,
+        };
+        if (org_role_id) profileInsert.org_role_id = org_role_id;
+
+        const { error: insertProfileError } = await supabaseAdmin
             .from('profiles')
-            .insert({
-                id: authData.user.id,
-                email,
-                name,
-                system_role,
-                role: system_role, // keep legacy column in sync
-                branch_id,
-                organization_id: branch.organization_id,
-                is_active: true,
-            });
+            .insert(profileInsert);
         if (insertProfileError) {
-            await adminClient.auth.admin.deleteUser(authData.user.id);
+            await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
             throw insertProfileError;
         }
 
-        // 3. Create staff entry — write both role and system_role
+        // 3. Create staff entry
         const staffInsert: Record<string, unknown> = {
             profile_id: authData.user.id,
             name,
             email,
             phone,
             system_role,
-            role: system_role, // keep legacy column in sync
             branch_id,
             organization_id: branch.organization_id,
             specializations: specializations || [],
@@ -111,13 +129,14 @@ export async function POST(request: NextRequest) {
             working_hours: working_hours,
             is_active: true,
         };
+        if (org_role_id) staffInsert.org_role_id = org_role_id;
         if (salary !== undefined && salary !== null) staffInsert.salary = salary;
         if (commission !== undefined && commission !== null) staffInsert.commission = commission;
 
-        const { error: staffError } = await adminClient.from('staff').insert(staffInsert);
+        const { error: staffError } = await supabaseAdmin.from('staff').insert(staffInsert);
         if (staffError) {
-            await adminClient.from('profiles').delete().eq('id', authData.user.id);
-            await adminClient.auth.admin.deleteUser(authData.user.id);
+            await supabaseAdmin.from('profiles').delete().eq('id', authData.user.id);
+            await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
             throw staffError;
         }
 
@@ -150,7 +169,7 @@ export async function POST(request: NextRequest) {
             );
             emailSent = emailResult.success;
         } catch {
-            // Don't fail the entire operation if email fails
+            // Don't fail if email fails
         }
 
         return NextResponse.json({
