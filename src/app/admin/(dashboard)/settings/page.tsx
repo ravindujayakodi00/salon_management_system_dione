@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, DollarSign, Save, Loader, Mail, Eye, EyeOff, CheckCircle, XCircle, CalendarDays, Clock, Trash2, Plus, Gift, Receipt, MapPin, Palette } from 'lucide-react';
+import { Lock, DollarSign, Save, Loader, Mail, Eye, EyeOff, CheckCircle, XCircle, CalendarDays, Clock, Trash2, Plus, Gift, Receipt, MapPin, Palette, Shield } from 'lucide-react';
 import TaxSettings from './TaxSettings';
 import BranchesSettings from './BranchesSettings';
 import PageAccessSettings from './PageAccessSettings';
 import BrandingSettings from './BrandingSettings';
+import RolesSettings from './RolesSettings';
 import { loyaltyService, LoyaltySettings as LoyaltySettingsType } from '@/services/loyalty';
 import Button from '@/components/shared/Button';
 import Input from '@/components/shared/Input';
@@ -18,6 +19,7 @@ import { supabase } from '@/lib/supabase';
 import { schedulingService } from '@/services/scheduling';
 import { availabilityService, AvailabilityRecord } from '@/services/availability';
 import { staffService } from '@/services/staff';
+import { orgRolesService } from '@/services/orgRoles';
 import { SystemRole } from '@/lib/types';
 
 interface ShowMessage {
@@ -284,6 +286,7 @@ function StaffPasswordSection({ showMessage }: StaffPasswordSectionProps) {
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [staff, setStaff] = useState<any[]>([]);
+    const [orgRolesMap, setOrgRolesMap] = useState<{ byId: Record<string, string>; bySystemRole: Record<string, string> }>({ byId: {}, bySystemRole: {} });
     const [selectedStaff, setSelectedStaff] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -296,13 +299,23 @@ function StaffPasswordSection({ showMessage }: StaffPasswordSectionProps) {
     const fetchStaff = async () => {
         if (!user?.organizationId) return;
         try {
-            const { data } = await supabase
-                .from('staff')
-                .select('id, name, email, system_role')
-                .eq('organization_id', user.organizationId)
-                .eq('is_active', true)
-                .order('name');
+            const [{ data }, roles] = await Promise.all([
+                supabase
+                    .from('staff')
+                    .select('id, name, email, system_role, org_role_id')
+                    .eq('organization_id', user.organizationId)
+                    .eq('is_active', true)
+                    .order('name'),
+                orgRolesService.getOrgRoles(user.organizationId),
+            ]);
             setStaff(data || []);
+            const byId: Record<string, string> = {};
+            const bySystemRole: Record<string, string> = {};
+            roles.forEach(r => {
+                byId[r.id] = r.displayName;
+                if (!bySystemRole[r.systemRole]) bySystemRole[r.systemRole] = r.displayName;
+            });
+            setOrgRolesMap({ byId, bySystemRole });
         } catch (error) {
             console.error('Error fetching staff:', error);
         }
@@ -381,7 +394,7 @@ function StaffPasswordSection({ showMessage }: StaffPasswordSectionProps) {
                         <option value="">Choose a staff member...</option>
                         {staff.map((s) => (
                             <option key={s.id} value={s.id}>
-                                {s.name} - {s.system_role} ({s.email})
+                                {s.name} - {orgRolesMap.byId[s.org_role_id] ?? orgRolesMap.bySystemRole[s.system_role] ?? s.system_role} ({s.email})
                             </option>
                         ))}
                     </select>
@@ -1232,7 +1245,7 @@ function LoyaltySettingsTab({ showMessage }: LoyaltySettingsTabProps) {
 export default function SettingsPage() {
     const { user, hasRole } = useAuth();
     const [activeTab, setActiveTab] = useState<
-        'passwords' | 'scheduling' | 'availability' | 'loyalty' | 'tax' | 'branches' | 'page_access' | 'branding'
+        'passwords' | 'scheduling' | 'availability' | 'loyalty' | 'tax' | 'branches' | 'page_access' | 'branding' | 'roles'
     >('passwords');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -1371,6 +1384,19 @@ export default function SettingsPage() {
                         Page Access
                     </button>
                 )}
+
+                {hasRole(['Owner']) && (
+                    <button
+                        onClick={() => setActiveTab('roles')}
+                        className={`px-4 py-2 font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'roles'
+                            ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                            : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                            }`}
+                    >
+                        <Shield className="h-4 w-4 inline mr-2" />
+                        Roles
+                    </button>
+                )}
             </div>
 
             {/* Tab Content */}
@@ -1424,6 +1450,10 @@ export default function SettingsPage() {
 
                 {activeTab === 'page_access' && hasRole(['Owner']) && (
                     <PageAccessSettings showMessage={showMessage} />
+                )}
+
+                {activeTab === 'roles' && hasRole(['Owner']) && (
+                    <RolesSettings showMessage={showMessage} />
                 )}
             </div>
         </div>

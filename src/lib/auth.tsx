@@ -87,17 +87,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         : organization.name;
                 }
             }
-            // Fetch display name from organization_roles matching this user's system_role
+            // Fetch display_name and org_role_id for this user from organization_roles
             let displayName: string = data.system_role ?? data.role ?? '';
-            if (data.organization_id && data.system_role) {
+            let orgRoleId: string | undefined = data.org_role_id || undefined;
+            if (data.organization_id && (data.system_role || data.role)) {
                 try {
-                    const { data: orgRole } = await supabase
-                        .from('organization_roles')
-                        .select('display_name')
-                        .eq('organization_id', data.organization_id)
-                        .eq('system_role', data.system_role)
-                        .maybeSingle();
-                    if (orgRole?.display_name) displayName = orgRole.display_name;
+                    if (orgRoleId) {
+                        const { data: orgRole } = await supabase
+                            .from('organization_roles')
+                            .select('display_name')
+                            .eq('id', orgRoleId)
+                            .maybeSingle();
+                        if (orgRole?.display_name) displayName = orgRole.display_name;
+                    } else {
+                        const { data: orgRole } = await supabase
+                            .from('organization_roles')
+                            .select('id, display_name')
+                            .eq('organization_id', data.organization_id)
+                            .eq('system_role', data.system_role ?? data.role)
+                            .order('is_deletable', { ascending: true })
+                            .maybeSingle();
+                        if (orgRole?.display_name) displayName = orgRole.display_name;
+                        if (orgRole?.id) orgRoleId = orgRole.id;
+                    }
                 } catch {
                     // fallback to system_role string
                 }
@@ -109,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 name: data.name,
                 role: displayName,
                 systemRole: (data.system_role ?? data.role) as SystemRole,
+                orgRoleId,
                 branchId: data.branch_id || undefined,
                 organizationId: data.organization_id as string,
                 organizationSlug,
